@@ -69,6 +69,8 @@ class MockGPIOAdapter(GPIOAdapter):
         self._outputs[pin] = safe_default
 
     def setup_input(self, pin: int, pull: str = "down") -> None:
+        if pull not in ("up", "down", "floating"):
+            raise GPIOError("invalid_value", f"pull must be 'up', 'down', or 'floating', got {pull!r}")
         self._inputs[pin] = 0
 
     def write_output(self, pin: int, value: int) -> None:
@@ -85,6 +87,8 @@ class MockGPIOAdapter(GPIOAdapter):
 
     def set_mock_input(self, pin: int, value: int) -> None:
         """Test helper: set the state returned by read_input for a configured input pin."""
+        if pin not in self._inputs:
+            raise GPIOError("wrong_direction", f"Pin {pin} is not configured as input")
         self._inputs[pin] = value
 
     def close(self) -> None:
