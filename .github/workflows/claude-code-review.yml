@@ -45,7 +45,7 @@ jobs:
           additional_permissions: |
             actions: read
           claude_args: >-
-            --model claude-opus-4-7
+            --model ${{ contains(github.event.pull_request.labels.*.name, 'critical') && 'claude-opus-4-7' || 'claude-sonnet-4-6' }}
             --allowedTools "Read,Glob,Grep,Bash(gh pr *),Bash(gh issue *),Bash(gh run *),Bash(git log *),Bash(git diff *),Bash(git show *),Bash(git status *),Bash(gh api *),Bash(ls *),Bash(wc *),Bash(cat *)"
           allowed_bots: '*'
 

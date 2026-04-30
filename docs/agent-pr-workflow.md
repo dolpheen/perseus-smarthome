@@ -19,7 +19,7 @@ Apply these to the **issue** (preferred — labels propagate through `Closes #N`
 | Label | When to use |
 |---|---|
 | `needs-manual-verification` | Acceptance requires human-run verification CI cannot perform: smoke tests, hardware E2E, manual smoke checks on the Raspberry Pi, anything reading `RPI_MCP_URL`. |
-| `critical` | Risky or sensitive change that benefits from explicit human review before merge: security-adjacent code, deployment scripts, anything that touches the GPIO allowlist or secret handling. |
+| `critical` | Risky or sensitive change that benefits from explicit human review before merge: security-adjacent code, deployment scripts, anything that touches the GPIO allowlist or secret handling. Also escalates the Claude reviewer from Sonnet 4.6 to Opus 4.7 for a deeper pass. |
 | `do-not-merge` | Generic block; use for in-flight PRs that should not merge yet. |
 
 ## Acceptance Criteria
