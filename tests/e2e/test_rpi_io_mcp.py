@@ -1,14 +1,16 @@
 """MacBook E2E tests for the Raspberry Pi I/O MCP server.
 
 These tests connect to a real Raspberry Pi MCP server over streamable HTTP.
-They require a loopback wire between GPIO23 (output) and GPIO24 (input) with
-a current-limiting resistor for the hardware/loopback tests.
 
-Run with:
-    RPI_MCP_URL=http://<raspberry-pi-ip>:8000/mcp uv run pytest tests/e2e/test_rpi_io_mcp.py
+Default run (no wiring required):
+    RPI_MCP_URL=http://<raspberry-pi-ip>:8000/mcp uv run pytest tests/e2e/
 
-All tests are marked @pytest.mark.e2e and are excluded from the default
-``uv run pytest -m "not e2e and not hardware"`` run.
+With GPIO23↔GPIO24 loopback wired through a current-limiting resistor:
+    RPI_MCP_URL=http://<raspberry-pi-ip>:8000/mcp uv run pytest tests/e2e/ --run-hardware
+
+Loopback tests are marked ``@pytest.mark.hardware`` and skipped by default
+(see ``tests/e2e/conftest.py``). All tests are also marked ``@pytest.mark.e2e``
+and are excluded from ``uv run pytest -m "not e2e and not hardware"``.
 
 Spec: IO-MCP-FR-007, IO-MCP-FR-009, IO-MCP-FR-010, IO-MCP-FR-011
 """
