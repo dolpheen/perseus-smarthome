@@ -3,7 +3,14 @@ name = "perseus-smarthome"
 version = "0.1.0"
 description = "Raspberry Pi smart home MCP control project."
 requires-python = ">=3.13"
-dependencies = []
+dependencies = [
+  "mcp>=1.0,<2",
+  "gpiozero>=2.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
 
 [dependency-groups]
 dev = [
