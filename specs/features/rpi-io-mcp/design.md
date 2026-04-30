@@ -1,6 +1,6 @@
 # Raspberry Pi I/O MCP Server Design
 
-Status: Draft  
+Status: Approved
 Last reviewed: 2026-04-30  
 Owner: Vadim  
 Requirements: requirements.md
@@ -262,4 +262,9 @@ Required behavior:
 
 ## Open Design Questions
 
-1. Should the service bind to all interfaces by default or require an explicit host setting during install?
+None for Milestone 1 implementation. The approved first implementation default is `0.0.0.0` on trusted LAN, with the MCP endpoint at `http://<raspberry-pi-ip>:8000/mcp`.
+
+## Change Log
+
+- 2026-04-30: Owner approved this design for Milestone 1 implementation.
+- 2026-04-30: Resolved the listen-address question by keeping the documented default `0.0.0.0` on trusted LAN.

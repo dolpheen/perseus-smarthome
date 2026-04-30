@@ -35,11 +35,16 @@ Before implementation, read:
 
 ## Current Status
 
-Ready to start Milestone 1 implementation after owner approval.
+Milestone 1 implementation is approved and ready to start.
+
+Use GitHub issue `#2`, "Scaffold Python project with uv and dependencies", as the first implementation task. GitHub issues `#2` through `#9` have native issue Relationships configured from their `Blocked by:` notes.
 
 Already created:
 
 - SDD workflow and specs.
+- Approved Milestone 1 Raspberry Pi I/O MCP requirements, design, and task plan.
+- GitHub implementation issues `#1` through `#9`.
+- Claude Code reviewer workflows and repository review guidance.
 - `.gitignore`
 - `.env.example`
 - `config/rpi-io.toml`
@@ -67,11 +72,11 @@ Not implemented yet:
 
 ## What To Do Next
 
-Follow `specs/features/rpi-io-mcp/tasks.md` in order.
+Follow `specs/features/rpi-io-mcp/tasks.md` and GitHub issue Relationships in order.
 
 Recommended next implementation plan:
 
-1. Scaffold Python project with `uv` -> verify: `uv run pytest` works.
+1. Implement issue `#2`: scaffold Python project with `uv` -> verify: `uv run pytest` works.
 2. Implement config/device registry -> verify: unit tests for `config/rpi-io.toml` and wrong-device cases.
 3. Implement GPIO adapter boundary and mock adapter -> verify: unit tests without Raspberry Pi hardware.
 4. Implement MCP HTTP server tools -> verify: unit tests for `health`, `list_devices`, `set_output`, `read_input`.

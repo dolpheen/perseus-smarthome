@@ -1,6 +1,6 @@
 # Raspberry Pi Smart Home LLM Control
 
-Status: Draft  
+Status: Approved
 Last reviewed: 2026-04-30  
 Owner: Vadim  
 Related code: config/rpi-io.toml; tools/find_raspberry.py; implementation TBD  
@@ -107,6 +107,8 @@ The first implementation milestone is MCP-only Raspberry Pi I/O control. LLM age
 
 ## Open Questions
 
+The following questions are future-scope and do not block Milestone 1 Raspberry Pi I/O MCP implementation.
+
 1. For CC2531, should the project integrate through Zigbee2MQTT, direct serial/Zigbee libraries, Home Assistant, or another stack?
 2. Should device state and action history be persisted across restarts?
 3. Should the project provide a human UI, or is agent/MCP control enough for the first version?
@@ -122,3 +124,4 @@ The first implementation milestone is MCP-only Raspberry Pi I/O control. LLM age
 - 2026-04-30: Set `uv` as the default package manager, `config/rpi-io.toml` as first milestone GPIO config, and `.env` as gitignored local Raspberry Pi access configuration.
 - 2026-04-30: Added MacBook-side headless Raspberry Pi LAN discovery tool based on SSH probing.
 - 2026-04-30: Set pytest as the project test runner.
+- 2026-04-30: Owner approved the Milestone 1 Raspberry Pi I/O MCP implementation scope; future CC2531 and broader smart home questions remain non-blocking.

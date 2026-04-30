@@ -1,6 +1,6 @@
 # Raspberry Pi I/O MCP Server Tasks
 
-Status: Draft  
+Status: Approved
 Last reviewed: 2026-04-30  
 Owner: Vadim  
 Requirements: requirements.md  
@@ -16,6 +16,25 @@ This milestone is complete when:
 - Manual output smoke test is completed for GPIO23.
 - Manual input smoke test is completed for GPIO24.
 - Separate manual Codex MCP smoke test is completed.
+
+## Current Status
+
+- Milestone 1 requirements, design, and task plan are approved for implementation.
+- GitHub issue dependencies are configured through native issue Relationships.
+- Start implementation with GitHub issue `#2`, "Scaffold Python project with uv and dependencies".
+- `tools/find_raspberry.py` and `tests/test_find_raspberry.py` already exist and were verified before Milestone 1 implementation start.
+
+## GitHub Implementation Issues
+
+- `#1`: Approve Milestone 1 Raspberry Pi I/O MCP specs.
+- `#2`: Scaffold Python project with uv and dependencies.
+- `#3`: Load GPIO devices from config/rpi-io.toml.
+- `#4`: Add GPIO adapter boundary with mock and GPIO Zero runtime adapter.
+- `#5`: Implement streamable HTTP MCP server tools for GPIO I/O.
+- `#6`: Add MacBook E2E MCP loopback tests.
+- `#7`: Add systemd deployment path for Raspberry Pi MCP server.
+- `#8`: Document manual GPIO and Codex MCP smoke tests.
+- `#9`: Close out Milestone 1 specs after implementation verification.
 
 ## Implementation Tasks
 
@@ -128,3 +147,8 @@ codex mcp get rpi-io
 ## Remaining Decisions Before Code
 
 None for Milestone 1 implementation.
+
+## Change Log
+
+- 2026-04-30: Owner approved the Milestone 1 task plan for implementation.
+- 2026-04-30: Added GitHub issue mapping and current implementation start point.
