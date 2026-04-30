@@ -1,0 +1,21 @@
+[server]
+host = "0.0.0.0"
+port = 8000
+transport = "streamable-http"
+
+[gpio]
+numbering = "BCM"
+
+[[devices]]
+id = "gpio23_output"
+name = "GPIO23 Output"
+kind = "output"
+pin = 23
+safe_default = 0
+
+[[devices]]
+id = "gpio24_input"
+name = "GPIO24 Input"
+kind = "input"
+pin = 24
+pull = "down"
