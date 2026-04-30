@@ -56,8 +56,8 @@ def _result_dict(result: Any) -> dict[str, Any]:
     raise AssertionError(f"CallToolResult has no content: {result!r}")
 
 
-async def _run_with_session(url: str, coro_fn: Any) -> Any:
-    """Open a streamable-HTTP MCP session and run coro_fn(session).
+async def _run_with_session(url: str, session_callback: Any) -> Any:
+    """Open a streamable-HTTP MCP session and run session_callback(session).
 
     Calls pytest.fail with a clear message when the server is unreachable,
     per IO-MCP-FR-010.
@@ -71,7 +71,7 @@ async def _run_with_session(url: str, coro_fn: Any) -> Any:
         async with streamablehttp_client(url, timeout=10.0) as (read, write, _):
             async with ClientSession(read, write) as session:
                 await session.initialize()
-                return await coro_fn(session)
+                return await session_callback(session)
     except* httpx.ConnectError as eg:
         pytest.fail(
             f"Cannot connect to MCP server at {url!r}. "
@@ -180,7 +180,10 @@ def test_loopback_low() -> None:
     """
     async def _check(session):
         # Drive high first to ensure we're testing a transition.
-        await session.call_tool("set_output", {"device_id": "gpio23_output", "value": 1})
+        setup_result = _result_dict(
+            await session.call_tool("set_output", {"device_id": "gpio23_output", "value": 1})
+        )
+        assert setup_result["ok"] is True, f"setup set_output high failed: {setup_result}"
 
         set_result = _result_dict(
             await session.call_tool("set_output", {"device_id": "gpio23_output", "value": 0})
