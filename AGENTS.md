@@ -45,6 +45,7 @@ Already created:
 - Draft Milestone 1 Raspberry Pi I/O MCP requirements, design, and task plan.
 - GitHub implementation issues `#1` through `#9`.
 - Claude Code reviewer workflows and repository review guidance.
+- CI workflow running `pytest` on pull requests and pushes to `main`.
 - `.gitignore`
 - `.env.example`
 - `config/rpi-io.toml`
