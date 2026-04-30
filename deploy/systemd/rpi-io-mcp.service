@@ -14,7 +14,10 @@ WorkingDirectory=/opt/raspberry-smarthome
 # default for `pipx install uv`). The deploy script substitutes /home/pi/ with
 # the actual deploy user's home before installing this unit.
 Environment="PATH=/home/pi/.local/bin:/usr/local/bin:/usr/bin:/bin"
-ExecStart=/home/pi/.local/bin/uv run rpi-io-mcp
+# --no-dev matches the deploy script's `uv sync --no-dev`. Without it, the
+# first service start re-syncs the venv to add dev dependencies (pytest et al.)
+# that the deploy intentionally skipped, which adds ~20s to startup on Pi 2.
+ExecStart=/home/pi/.local/bin/uv run --no-dev rpi-io-mcp
 Restart=on-failure
 RestartSec=5
 # Cap the SIGTERM-to-SIGKILL window so a hung asyncio shutdown cannot
