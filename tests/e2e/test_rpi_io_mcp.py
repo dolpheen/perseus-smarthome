@@ -72,15 +72,15 @@ async def _run_with_session(url: str, session_callback: Any) -> Any:
             async with ClientSession(read, write) as session:
                 await session.initialize()
                 return await session_callback(session)
-    except* httpx.ConnectError as eg:
+    except httpx.ConnectError as e:
         pytest.fail(
             f"Cannot connect to MCP server at {url!r}. "
             f"Check that the server is running and the URL is correct. "
-            f"Error: {eg.exceptions[0]}"
+            f"Error: {e}"
         )
-    except* (httpx.TimeoutException, httpx.HTTPError) as eg:
+    except (httpx.TimeoutException, httpx.HTTPError) as e:
         pytest.fail(
-            f"HTTP error connecting to MCP server at {url!r}: {eg.exceptions[0]}"
+            f"HTTP error connecting to MCP server at {url!r}: {e}"
         )
 
 
@@ -255,5 +255,40 @@ def test_wrong_direction_read_input_rejected() -> None:
         )
         assert result["ok"] is False
         assert result["error"] == "wrong_direction"
+
+    _run(_check)
+
+
+# ---------------------------------------------------------------------------
+# health tool
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.e2e
+def test_health_returns_ok_and_service_details() -> None:
+    """health must return ok=True, service name, and transport details."""
+    async def _check(session):
+        result = _result_dict(await session.call_tool("health", {}))
+        assert result["ok"] is True
+        assert result["service"] == "rpi-io-mcp"
+        assert result["transport"] == "streamable-http"
+
+    _run(_check)
+
+
+# ---------------------------------------------------------------------------
+# set_output invalid value rejection
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.e2e
+def test_invalid_value_set_output_rejected() -> None:
+    """set_output with a value other than 0/1 must return a structured invalid_value error."""
+    async def _check(session):
+        result = _result_dict(
+            await session.call_tool("set_output", {"device_id": "gpio23_output", "value": 99})
+        )
+        assert result["ok"] is False
+        assert result["error"] == "invalid_value"
 
     _run(_check)
