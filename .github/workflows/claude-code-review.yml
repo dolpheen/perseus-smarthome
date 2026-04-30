@@ -11,47 +11,78 @@ concurrency:
 jobs:
   claude-review:
     runs-on: ubuntu-latest
+    if: ${{ github.event.pull_request.draft == false }}
     permissions:
       contents: read
       pull-requests: write
       issues: write
-      id-token: write
-      actions: read
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 1
+          fetch-depth: 0
 
       - name: Run Claude Code Review
         id: claude-review
-        uses: anthropics/claude-code-action@v1
+        uses: anthropics/claude-code-base-action@beta
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_REPO: ${{ github.repository }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_BASE_REF: ${{ github.event.pull_request.base.ref }}
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
-          # Bot-authored PRs can't exchange OIDC for an App token because the
-          # actor lacks write access; fall back to GITHUB_TOKEN only in that
-          # case so human PRs keep claude[bot] attribution.
-          github_token: ${{ github.event.pull_request.user.type == 'Bot' && secrets.GITHUB_TOKEN || '' }}
-          plugin_marketplaces: 'https://github.com/anthropics/claude-code.git'
-          plugins: 'code-review@claude-code-plugins'
+          model: ${{ contains(github.event.pull_request.labels.*.name, 'critical') && 'claude-opus-4-7' || 'claude-sonnet-4-6' }}
+          allowed_tools: "Read,Glob,Grep,Bash(gh pr view:*),Bash(gh pr diff:*),Bash(gh pr comment:*),Bash(gh issue view:*),Bash(gh run view:*),Bash(gh api:*),Bash(git log:*),Bash(git diff:*),Bash(git show:*),Bash(git status:*),Bash(ls:*),Bash(wc:*),Bash(cat:*)"
           prompt: |
-            /code-review:code-review ${{ github.repository }}/pull/${{ github.event.pull_request.number }} --comment
+            You are reviewing pull request #${{ github.event.pull_request.number }} on ${{ github.repository }}.
 
             Apply CLAUDE.md strictly. Review as a findings-first reviewer:
             prioritize correctness, safety, security, reliability, contract
             compatibility, SDD/spec alignment, and missing acceptance tests.
             Do not spend comments on style or unrelated refactors.
-          additional_permissions: |
-            actions: read
-          claude_args: >-
-            --model ${{ contains(github.event.pull_request.labels.*.name, 'critical') && 'claude-opus-4-7' || 'claude-sonnet-4-6' }}
-            --allowedTools "Read,Glob,Grep,Bash(gh pr *),Bash(gh issue *),Bash(gh run *),Bash(git log *),Bash(git diff *),Bash(git show *),Bash(git status *),Bash(gh api *),Bash(ls *),Bash(wc *),Bash(cat *)"
-          allowed_bots: '*'
+
+            Steps:
+            1. Read CLAUDE.md and the relevant specs under `specs/`,
+               especially `specs/features/rpi-io-mcp/requirements.md`,
+               `specs/features/rpi-io-mcp/design.md`, and
+               `specs/features/rpi-io-mcp/tasks.md` for Milestone 1 work.
+            2. Inspect the PR via `gh pr view ${{ github.event.pull_request.number }}`
+               and `gh pr diff ${{ github.event.pull_request.number }}`.
+            3. Find the linked issue from the PR body (`Closes #N` /
+               `Fixes #N` / `Resolves #N`) and read it via `gh issue view N`.
+            4. Identify file:line-anchored findings, ordered Blocking →
+               Important → Minor. Each finding must include exact file/line,
+               the defect or missing coverage, why it matters for behavior,
+               safety, security, reliability, or the accepted spec, and the
+               smallest practical fix direction.
+            5. Verify each acceptance criterion from the linked issue against
+               the diff. Do not pre-tick the boxes — describe whether the
+               diff satisfies each criterion and what verification was used.
+            6. Post a single PR comment with your findings using
+               `gh pr comment ${{ github.event.pull_request.number }} --body "..."`.
+               Structure the comment as:
+               - `## Findings` (or `## No findings` if clean) — Blocking,
+                 Important, Minor sections.
+               - `## Acceptance criteria verification` — one bullet per
+                 criterion with status and evidence.
+               - `## Residual risks / not verified` — anything you could
+                 not check (hardware verification, manual smoke, etc.).
+
+            If there are no findings, say so clearly and list any residual
+            risks or tests that were not run. Keep the comment scoped to the
+            PR goal unless there is a direct safety, correctness, or
+            acceptance risk.
+
+            If the workflow cannot find the linked issue, post a Blocking
+            finding asking the author to add `Closes #N`.
 
       - name: Upload Claude execution output
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: claude-execution-output
-          path: ${{ runner.temp }}/claude-execution-output.json
+          path: ${{ steps.claude-review.outputs.execution_file }}
+          if-no-files-found: warn
