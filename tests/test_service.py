@@ -46,6 +46,31 @@ def _make_service_with_history() -> tuple[GPIOService, HistoryMockAdapter]:
     return service, adapter
 
 
+class PartialInitFailingAdapter(MockGPIOAdapter):
+    """MockGPIOAdapter where setup_output succeeds but setup_input raises.
+
+    Records write_output history and whether close() was invoked, so tests
+    can verify the __init__ cleanup path drives outputs low and releases
+    the adapter before re-raising.
+    """
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.write_history: list[tuple[int, int]] = []
+        self.close_called = False
+
+    def setup_input(self, pin: int, pull: str = "down") -> None:
+        raise GPIOError("gpio_unavailable", f"Simulated failure on input pin {pin}")
+
+    def write_output(self, pin: int, value: int) -> None:
+        super().write_output(pin, value)
+        self.write_history.append((pin, value))
+
+    def close(self) -> None:
+        self.close_called = True
+        super().close()
+
+
 class FailingMockAdapter(GPIOAdapter):
     """Adapter that raises GPIOError on write_output and read_input calls."""
 
@@ -85,6 +110,26 @@ def test_service_init_configures_input_pin() -> None:
     """GPIO24 must be set up as input on startup."""
     _, adapter = _make_service()
     assert 24 in adapter._inputs
+
+
+def test_partial_init_failure_releases_adapter_and_drives_outputs_low() -> None:
+    """If _init_pins fails partway, __init__ must drive outputs low and
+    release the adapter before re-raising (design.md Safety Rules)."""
+    config = load_config()
+    registry = build_registry(config)
+    adapter = PartialInitFailingAdapter()
+    try:
+        GPIOService(registry, adapter)
+    except GPIOError as exc:
+        assert exc.code == "gpio_unavailable"
+    else:
+        raise AssertionError("Expected GPIOError to propagate from __init__")
+    assert adapter.close_called, "Expected adapter.close() on partial init failure"
+    pin23_writes = [(pin, val) for pin, val in adapter.write_history if pin == 23]
+    assert pin23_writes, "Expected at least one write to pin 23 during cleanup"
+    assert pin23_writes[-1] == (23, 0), (
+        f"Expected final write to pin 23 to be 0, got {pin23_writes[-1]}"
+    )
 
 
 # ---------------------------------------------------------------------------

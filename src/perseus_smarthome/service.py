@@ -19,7 +19,17 @@ class GPIOService:
     def __init__(self, registry: DeviceRegistry, adapter: GPIOAdapter) -> None:
         self._registry = registry
         self._adapter = adapter
-        self._init_pins()
+        try:
+            self._init_pins()
+        except GPIOError:
+            # Partial init may have configured GPIO23 as an active output.
+            # Drive outputs low and release the adapter before re-raising so no
+            # pin is left driven without a teardown path (design.md Safety Rules).
+            try:
+                self.close()
+            except GPIOError:
+                pass
+            raise
 
     def _init_pins(self) -> None:
         """Configure all registered GPIO pins on startup."""
