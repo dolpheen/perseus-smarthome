@@ -1,8 +1,9 @@
 # Manual GPIO and Codex MCP Smoke Tests
 
 Walk-through guides for verifying `rpi-io-mcp` against real hardware on the
-Raspberry Pi. These complement the deterministic MacBook E2E suite
-(`tests/e2e/test_rpi_io_mcp.py`):
+Raspberry Pi. These complement the deterministic MacBook E2E suite (the
+pytest E2E module under `tests/e2e/`, landing alongside this doc as part of
+Milestone 1):
 
 - The E2E suite proves the MCP contract over the wire.
 - The smoke tests prove the wired hardware path — GPIO voltages, LED
@@ -15,7 +16,10 @@ Maps to `IO-MCP-FR-012` (output smoke) and `IO-MCP-FR-013` (input smoke) in
 
 ## Prerequisites
 
-- `rpi-io-mcp` running on the Pi (see `docs/deployment.md`).
+- `rpi-io-mcp` already running on the Pi (deploy guide in `docs/deployment.md`
+  ships alongside this doc as part of Milestone 1; for a one-off
+  verification before that lands, start the server by hand on the Pi with
+  `cd /path/to/repo && uv run rpi-io-mcp`).
 - Endpoint reachable from MacBook at `http://<pi>:8000/mcp`.
 - Export the URL once for this shell:
 
@@ -23,8 +27,12 @@ Maps to `IO-MCP-FR-012` (output smoke) and `IO-MCP-FR-013` (input smoke) in
   export RPI_MCP_URL=http://<pi>:8000/mcp
   ```
 
-Pick whichever smoke paths your bench has parts for; you do not need to run
-all of them. The multimeter protocol needs only a meter, no extra wiring.
+Output and input smoke each have multiple wiring variants — pick **one
+output variant** (multimeter / LED / relay) and **one input variant**
+(multimeter / push-button) based on the parts you have on hand. The Codex
+client smoke is its own check and should be run in addition once the
+output and input paths verify. See "[What 'passing' means](#what-passing-means-for-milestone-1)"
+for the per-criterion checklist.
 
 ## Multimeter protocol (no extra wiring)
 
@@ -160,9 +168,9 @@ an LLM-driven client rather than a pytest fixture.
 
 ## What "passing" means for Milestone 1
 
-- The deterministic E2E suite is green against the live endpoint
-  (`uv run pytest tests/e2e/ --run-hardware` on PR #35's branch / merged
-  main once Milestone 1 closes).
+- The deterministic E2E suite is green against the live endpoint:
+  `RPI_MCP_URL=http://<pi>:8000/mcp uv run pytest tests/e2e/ --run-hardware`
+  (the suite and the `--run-hardware` opt-in are added under Milestone 1).
 - At least one of the output smoke paths (multimeter, LED, or relay) shows
   GPIO23 toggling under MCP control.
 - At least one of the input smoke paths (multimeter or push-button) shows

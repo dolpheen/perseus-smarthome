@@ -106,33 +106,43 @@ async def _run_steps(url: str, report: Report) -> None:
                 raise RuntimeError(f"Server health failed: {health!r}")
             print(f"  Server: {health.get('service')} via {health.get('transport')}\n")
 
-            # ---------- Step 1: GPIO23 output, drive LOW ----------
-            print("\nStep 1 — GPIO23 drives LOW (~0V)")
-            print("  Probe placement:")
-            print("    - Black probe: any GND header pin (e.g., physical 6 or 14)")
-            print("    - Red probe:   physical pin 16 (BCM23)")
-            _wait_for_enter("Probes in place?")
-            res = _result_dict(
-                await session.call_tool("set_output", {"device_id": "gpio23_output", "value": 0})
-            )
-            print(f"  Server response: {res}")
-            ok, note = _prompt_yes("Does the meter read approximately 0V (within ±0.1V)?")
-            report.add(StepResult("GPIO23 → LOW reads ~0V on meter", "~0V", ok, note))
+            # All GPIO23 manipulation runs inside try/finally so that any
+            # interruption — Ctrl+C, network error, server restart, an
+            # exception inside _prompt_yes / _wait_for_enter — drives GPIO23
+            # back to 0 before the script exits. design.md Safety Rules
+            # require GPIO23 to not stay driven across operator interruptions.
+            try:
+                # ---------- Step 1: GPIO23 output, drive LOW ----------
+                print("\nStep 1 — GPIO23 drives LOW (~0V)")
+                print("  Probe placement:")
+                print("    - Black probe: any GND header pin (e.g., physical 6 or 14)")
+                print("    - Red probe:   physical pin 16 (BCM23)")
+                _wait_for_enter("Probes in place?")
+                res = _result_dict(
+                    await session.call_tool("set_output", {"device_id": "gpio23_output", "value": 0})
+                )
+                print(f"  Server response: {res}")
+                ok, note = _prompt_yes("Does the meter read approximately 0V (within ±0.1V)?")
+                report.add(StepResult("GPIO23 → LOW reads ~0V on meter", "~0V", ok, note))
 
-            # ---------- Step 2: GPIO23 output, drive HIGH ----------
-            print("\nStep 2 — GPIO23 drives HIGH (~3.3V)")
-            print("  Keep the same probe placement as Step 1.")
-            _wait_for_enter("Ready?")
-            res = _result_dict(
-                await session.call_tool("set_output", {"device_id": "gpio23_output", "value": 1})
-            )
-            print(f"  Server response: {res}")
-            ok, note = _prompt_yes("Does the meter read approximately 3.3V (within ±0.2V)?")
-            report.add(StepResult("GPIO23 → HIGH reads ~3.3V on meter", "~3.3V", ok, note))
-
-            # Always reset GPIO23 to 0 before continuing.
-            await session.call_tool("set_output", {"device_id": "gpio23_output", "value": 0})
-            print("  (GPIO23 reset to 0)")
+                # ---------- Step 2: GPIO23 output, drive HIGH ----------
+                print("\nStep 2 — GPIO23 drives HIGH (~3.3V)")
+                print("  Keep the same probe placement as Step 1.")
+                _wait_for_enter("Ready?")
+                res = _result_dict(
+                    await session.call_tool("set_output", {"device_id": "gpio23_output", "value": 1})
+                )
+                print(f"  Server response: {res}")
+                ok, note = _prompt_yes("Does the meter read approximately 3.3V (within ±0.2V)?")
+                report.add(StepResult("GPIO23 → HIGH reads ~3.3V on meter", "~3.3V", ok, note))
+            finally:
+                # Best-effort reset; suppress any error from the call so the
+                # original exception (if any) propagates intact.
+                try:
+                    await session.call_tool("set_output", {"device_id": "gpio23_output", "value": 0})
+                    print("  (GPIO23 reset to 0)")
+                except Exception:  # noqa: BLE001 — operator-tool teardown
+                    print("  (warning: GPIO23 reset call failed; verify pin state manually)")
 
             # ---------- Step 3: GPIO24 input, default pull-down reads 0 ----------
             print("\nStep 3 — GPIO24 input, no wiring, internal pull-down reads 0")
