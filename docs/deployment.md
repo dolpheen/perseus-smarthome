@@ -138,7 +138,7 @@ From the MacBook, after the service is running:
 # Quick health check (requires curl)
 curl http://raspberrypi.local:8000/mcp
 
-# Full E2E test suite
+# Full E2E test suite (requires issue #6 branch to be merged)
 RPI_MCP_URL=http://raspberrypi.local:8000/mcp uv run pytest tests/e2e/test_rpi_io_mcp.py
 ```
 
@@ -151,6 +151,11 @@ Replace `raspberrypi.local` with the Pi's IP address if mDNS is not available.
   reboot. This is handled by `GPIOService.__init__` (see
   `src/perseus_smarthome/service.py`) which sets the pin low before the MCP
   server begins accepting requests. Satisfies IO-MCP-FR-015.
+- When systemd stops or restarts the service (`systemctl stop/restart`), it
+  sends SIGTERM. `server.py:main()` installs a SIGTERM handler that raises
+  `SystemExit(0)`, which propagates through the `try/finally` block and
+  ensures `service.close()` drives GPIO23 low before the process exits
+  (design.md Safety Rules).
 - GPIO24 is input-only; the service never drives it.
 - The service binds on `0.0.0.0:8000`. Keep the Raspberry Pi on a trusted LAN
   segment. No authentication is required or provided in Milestone 1.

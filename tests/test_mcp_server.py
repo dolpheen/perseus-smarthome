@@ -7,7 +7,9 @@ Tools are called via FastMCP.call_tool() without starting an HTTP listener.
 from __future__ import annotations
 
 import asyncio
+import signal
 from typing import Any
+from unittest.mock import MagicMock, patch
 
 from perseus_smarthome.config import load_config
 from perseus_smarthome.devices import build_registry
@@ -247,3 +249,62 @@ def test_main_is_callable() -> None:
     import perseus_smarthome.server as server_module
 
     assert callable(server_module.main)
+
+
+# ---------------------------------------------------------------------------
+# server.main SIGTERM handler
+# ---------------------------------------------------------------------------
+
+
+def test_main_registers_sigterm_handler() -> None:
+    """main() must install a SIGTERM handler before the server starts."""
+    import pytest
+
+    registered: dict[int, Any] = {}
+
+    def _record(sig: int, handler: Any) -> None:
+        registered[sig] = handler
+
+    mock_service = MagicMock()
+    mock_mcp = MagicMock()
+
+    with (
+        patch("signal.signal", side_effect=_record),
+        patch("perseus_smarthome.config.load_config"),
+        patch("perseus_smarthome.devices.build_registry"),
+        patch("perseus_smarthome.gpio.GPIOZeroAdapter"),
+        patch("perseus_smarthome.server.GPIOService", return_value=mock_service),
+        patch("perseus_smarthome.server.create_server", return_value=mock_mcp),
+    ):
+        import perseus_smarthome.server as server_module
+        server_module.main()
+
+    assert signal.SIGTERM in registered, "SIGTERM handler was not installed by main()"
+    # The registered handler must raise SystemExit(0) so the try/finally runs.
+    with pytest.raises(SystemExit) as exc_info:
+        registered[signal.SIGTERM](signal.SIGTERM, None)
+    assert exc_info.value.code == 0
+
+
+def test_main_sigterm_handler_triggers_service_close() -> None:
+    """SystemExit from the SIGTERM handler must cause service.close() to run."""
+    import pytest
+
+    mock_service = MagicMock()
+    mock_mcp = MagicMock()
+    # Simulate mcp.run() raising SystemExit(0) as the SIGTERM handler would do.
+    mock_mcp.run.side_effect = SystemExit(0)
+
+    with (
+        patch("signal.signal"),
+        patch("perseus_smarthome.config.load_config"),
+        patch("perseus_smarthome.devices.build_registry"),
+        patch("perseus_smarthome.gpio.GPIOZeroAdapter"),
+        patch("perseus_smarthome.server.GPIOService", return_value=mock_service),
+        patch("perseus_smarthome.server.create_server", return_value=mock_mcp),
+    ):
+        import perseus_smarthome.server as server_module
+        with pytest.raises(SystemExit):
+            server_module.main()
+
+    mock_service.close.assert_called_once()

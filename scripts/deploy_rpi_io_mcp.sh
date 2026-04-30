@@ -37,6 +37,13 @@ if [[ -n "${RPI_SSH_KEY_PATH:-}" ]]; then
 fi
 SSH_TARGET="${RPI_SSH_USER}@${RPI_SSH_HOST}"
 
+# Build the rsync remote-shell command with properly shell-quoted SSH options
+# so paths that contain spaces (e.g. RPI_SSH_KEY_PATH) are handled correctly.
+_ssh_rsh="ssh"
+for _arg in "${SSH_OPTS[@]}"; do
+  _ssh_rsh+=" $(printf '%q' "${_arg}")"
+done
+
 RSYNC_OPTS=(
   -az --delete
   --exclude=".git"
@@ -45,13 +52,13 @@ RSYNC_OPTS=(
   --exclude="__pycache__"
   --exclude="*.pyc"
   --exclude=".pytest_cache"
-  -e "ssh ${SSH_OPTS[*]}"
+  -e "${_ssh_rsh}"
 )
 
 echo "==> Syncing project to ${SSH_TARGET}:${RPI_PROJECT_DIR}"
 # Ensure the remote directory exists and is owned by the deploy user
 ssh "${SSH_OPTS[@]}" "${SSH_TARGET}" \
-  "sudo mkdir -p '${RPI_PROJECT_DIR}' && sudo chown '${RPI_SSH_USER}:${RPI_SSH_USER}' '${RPI_PROJECT_DIR}'"
+  "sudo mkdir -p '${RPI_PROJECT_DIR}' && sudo chown '${RPI_SSH_USER}:gpio' '${RPI_PROJECT_DIR}'"
 
 rsync "${RSYNC_OPTS[@]}" "${REPO_ROOT}/" "${SSH_TARGET}:${RPI_PROJECT_DIR}/"
 
@@ -62,7 +69,10 @@ ssh "${SSH_OPTS[@]}" "${SSH_TARGET}" \
 echo "==> Installing systemd service"
 ssh "${SSH_OPTS[@]}" "${SSH_TARGET}" bash <<EOF
 set -euo pipefail
-sudo cp '${RPI_PROJECT_DIR}/deploy/systemd/rpi-io-mcp.service' /etc/systemd/system/rpi-io-mcp.service
+# Template the unit file so WorkingDirectory matches the actual install path.
+sed 's|/opt/raspberry-smarthome|${RPI_PROJECT_DIR}|g' \
+  '${RPI_PROJECT_DIR}/deploy/systemd/rpi-io-mcp.service' \
+  | sudo tee /etc/systemd/system/rpi-io-mcp.service > /dev/null
 sudo systemctl daemon-reload
 sudo systemctl enable rpi-io-mcp.service
 sudo systemctl restart rpi-io-mcp.service
