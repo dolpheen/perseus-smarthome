@@ -1,0 +1,117 @@
+name: Auto-merge
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, ready_for_review, labeled, unlabeled]
+  check_suite:
+    types: [completed]
+  pull_request_review:
+    types: [submitted]
+
+permissions:
+  pull-requests: write
+  contents: write
+  issues: read
+
+concurrency:
+  group: auto-merge-${{ github.event.pull_request.number || github.event.check_suite.head_sha }}
+  cancel-in-progress: false
+
+jobs:
+  auto-merge:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Resolve PR number
+        id: pr
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          case "${{ github.event_name }}" in
+            pull_request|pull_request_review)
+              echo "number=${{ github.event.pull_request.number }}" >> "$GITHUB_OUTPUT"
+              ;;
+            check_suite)
+              sha="${{ github.event.check_suite.head_sha }}"
+              num=$(gh api "repos/$REPO/commits/$sha/pulls" --jq '.[] | select(.state=="open") | .number' | head -1)
+              echo "number=${num:-}" >> "$GITHUB_OUTPUT"
+              ;;
+          esac
+
+      - name: Decide whether to merge
+        id: gate
+        if: steps.pr.outputs.number != ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ steps.pr.outputs.number }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+
+          opt_out_labels=("critical" "needs-manual-verification" "do-not-merge")
+          required_checks=("pytest" "claude-review")
+
+          pr_data=$(gh pr view "$PR_NUMBER" --repo "$REPO" --json state,isDraft,labels,mergeable,mergeStateStatus)
+          state=$(jq -r '.state' <<<"$pr_data")
+          is_draft=$(jq -r '.isDraft' <<<"$pr_data")
+
+          if [[ "$state" != "OPEN" || "$is_draft" == "true" ]]; then
+            echo "PR not eligible: state=$state, draft=$is_draft"
+            echo "merge=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          for label in $(jq -r '.labels[].name' <<<"$pr_data"); do
+            for opt in "${opt_out_labels[@]}"; do
+              if [[ "$label" == "$opt" ]]; then
+                echo "PR has opt-out label: $label"
+                echo "merge=false" >> "$GITHUB_OUTPUT"
+                exit 0
+              fi
+            done
+          done
+
+          owner="${REPO%/*}"
+          name="${REPO#*/}"
+          issue_labels=$(gh api graphql -f query="
+            query { repository(owner:\"$owner\", name:\"$name\") {
+              pullRequest(number:$PR_NUMBER) {
+                closingIssuesReferences(first:10) {
+                  nodes { labels(first:30) { nodes { name } } }
+                }
+              }
+            }}" --jq '.data.repository.pullRequest.closingIssuesReferences.nodes[].labels.nodes[].name' || true)
+
+          while IFS= read -r label; do
+            [[ -z "$label" ]] && continue
+            for opt in "${opt_out_labels[@]}"; do
+              if [[ "$label" == "$opt" ]]; then
+                echo "Linked issue has opt-out label: $label"
+                echo "merge=false" >> "$GITHUB_OUTPUT"
+                exit 0
+              fi
+            done
+          done <<<"$issue_labels"
+
+          checks=$(gh pr checks "$PR_NUMBER" --repo "$REPO" --json name,bucket || true)
+          for required in "${required_checks[@]}"; do
+            bucket=$(jq -r --arg n "$required" '[.[] | select(.name==$n)] | last | .bucket // "missing"' <<<"$checks")
+            if [[ "$bucket" != "pass" ]]; then
+              echo "Required check '$required' is $bucket, not merging"
+              echo "merge=false" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+          done
+
+          echo "All conditions met"
+          echo "merge=true" >> "$GITHUB_OUTPUT"
+
+      - name: Merge
+        if: steps.gate.outputs.merge == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ steps.pr.outputs.number }}
+          REPO: ${{ github.repository }}
+        run: |
+          gh pr merge "$PR_NUMBER" --repo "$REPO" --squash --delete-branch
