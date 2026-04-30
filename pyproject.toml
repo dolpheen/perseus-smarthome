@@ -6,7 +6,17 @@ requires-python = ">=3.13"
 dependencies = [
   "mcp>=1.0,<2",
   "gpiozero>=2.0",
+  # GPIO Zero needs a pin factory at runtime; lgpio is the recommended
+  # backend on Raspberry Pi OS Trixie. Linux-only so non-Pi dev installs
+  # (macOS, Windows) skip it and fall back to the mock adapter in tests.
+  "lgpio>=0.2; sys_platform == 'linux'",
 ]
+# Raspberry Pi 2 (armv7l) provisioning note for issue #7 (deploy):
+# Several runtime deps source-build on armv7l because no manylinux*_armv7l
+# wheel is published. `cffi 2.x` enters via `mcp -> pyjwt[crypto] ->
+# cryptography -> cffi`; `lgpio` is sdist-only and wraps the lgpio C
+# library. Run before `uv sync` on the Pi:
+#   sudo apt install -y libffi-dev python3-dev build-essential
 
 [build-system]
 requires = ["hatchling"]
