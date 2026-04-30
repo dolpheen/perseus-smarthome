@@ -73,10 +73,19 @@ echo "==> Installing/updating Python dependencies on Pi"
 ssh "${SSH_OPTS[@]}" "${SSH_TARGET}" \
   "command -v uv >/dev/null 2>&1 || { echo \"ERROR: 'uv' not found on the Raspberry Pi. Install it first: curl -LsSf https://astral.sh/uv/install.sh | sh\"; exit 1; } && cd '${REMOTE_DIR}' && uv sync --no-dev"
 
-echo "==> Installing systemd service"
-ssh "${SSH_OPTS[@]}" "${SSH_TARGET}" bash <<'EOF'
+echo "==> Installing systemd service (rendered for User=${RPI_SSH_USER})"
+ssh "${SSH_OPTS[@]}" "${SSH_TARGET}" "DEPLOY_USER='${RPI_SSH_USER}' bash -s" <<'EOF'
 set -euo pipefail
-sudo cp /opt/raspberry-smarthome/deploy/systemd/rpi-io-mcp.service /etc/systemd/system/rpi-io-mcp.service
+# Render the unit with the actual deploy user. The repo's unit file uses
+# `pi` as the canonical Raspbian default, but a Pi whose primary user is
+# something other than `pi` (e.g. `perseus`) needs the User= and PATH
+# rewritten so systemd starts the service as the user that owns
+# /opt/raspberry-smarthome.
+sudo sed \
+    -e "s|^User=pi$|User=${DEPLOY_USER}|" \
+    -e "s|/home/pi/|/home/${DEPLOY_USER}/|g" \
+    /opt/raspberry-smarthome/deploy/systemd/rpi-io-mcp.service \
+    | sudo tee /etc/systemd/system/rpi-io-mcp.service > /dev/null
 sudo systemctl daemon-reload
 sudo systemctl enable rpi-io-mcp.service
 sudo systemctl restart rpi-io-mcp.service
