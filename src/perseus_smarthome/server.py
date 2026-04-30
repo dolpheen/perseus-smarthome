@@ -7,6 +7,8 @@ The MCP endpoint is ``http://<host>:8000/mcp`` by default.
 
 from __future__ import annotations
 
+import signal
+import sys
 from typing import Any
 
 from mcp.server.fastmcp import FastMCP
@@ -61,19 +63,30 @@ def create_server(
 
 def main() -> None:
     """Start the streamable HTTP MCP server using the real GPIO adapter."""
+    # Install a SIGTERM handler so that systemd stop/restart cycles propagate
+    # SystemExit through the try/finally below and service.close() drives
+    # GPIO23 low before the process exits (design.md Safety Rules, FR-015).
+    signal.signal(signal.SIGTERM, lambda *_: sys.exit(0))
+
     from perseus_smarthome.config import load_config
     from perseus_smarthome.devices import build_registry
     from perseus_smarthome.gpio import GPIOZeroAdapter
 
-    config = load_config()
-    registry = build_registry(config)
-    adapter = GPIOZeroAdapter()
-    service = GPIOService(registry, adapter)
-    mcp = create_server(service)
+    # Widen the try/finally to cover setup. If SIGTERM arrives during config
+    # load, registry build, adapter init, or service init, service.close()
+    # still runs whenever a service was constructed — so the GPIO adapter is
+    # released and GPIO23 cannot be left configured without a teardown path.
+    service: GPIOService | None = None
     try:
+        config = load_config()
+        registry = build_registry(config)
+        adapter = GPIOZeroAdapter()
+        service = GPIOService(registry, adapter)
+        mcp = create_server(service)
         mcp.run(transport="streamable-http")
     finally:
-        service.close()
+        if service is not None:
+            service.close()
 
 
 if __name__ == "__main__":

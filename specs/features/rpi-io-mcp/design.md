@@ -73,12 +73,15 @@ RPI_SSH_PORT
 RPI_SSH_USER
 RPI_SSH_KEY_PATH
 RPI_SSH_PASSWORD
-RPI_PROJECT_DIR
 RPI_DISCOVERY_SUBNET
 RPI_MCP_HOST
 RPI_MCP_PORT
 RPI_MCP_URL
 ```
+
+The systemd install path on the Pi is fixed at `/opt/raspberry-smarthome` —
+no `RPI_PROJECT_DIR` override — so the unit file, deploy script, and docs all
+agree without templating.
 
 Prefer SSH keys or `ssh-agent` over password-based automation. Password values, if used during development, must remain local.
 
