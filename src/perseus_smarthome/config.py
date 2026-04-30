@@ -46,7 +46,7 @@ def _validate(data: dict[str, Any]) -> None:
                 raise ConfigError(
                     f"Device entry {i} is missing required field '{field_name}'."
                 )
-        if not isinstance(device["pin"], int):
+        if not isinstance(device["pin"], int) or isinstance(device["pin"], bool):
             device_label = device.get("id", f"entry {i}")
             raise ConfigError(
                 f"Device '{device_label}' has non-integer pin value."

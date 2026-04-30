@@ -201,6 +201,25 @@ def test_load_config_rejects_device_non_integer_pin(tmp_path: Path) -> None:
         load_config(cfg)
 
 
+def test_load_config_rejects_device_boolean_pin(tmp_path: Path) -> None:
+    cfg = tmp_path / "rpi-io.toml"
+    cfg.write_text(
+        textwrap.dedent("""\
+            [gpio]
+            numbering = "BCM"
+
+            [[devices]]
+            id = "gpio23_output"
+            name = "GPIO23 Output"
+            kind = "output"
+            pin = true
+        """),
+        encoding="utf-8",
+    )
+    with pytest.raises(ConfigError, match="non-integer pin"):
+        load_config(cfg)
+
+
 def test_load_config_rejects_device_unsupported_kind(tmp_path: Path) -> None:
     cfg = tmp_path / "rpi-io.toml"
     cfg.write_text(
