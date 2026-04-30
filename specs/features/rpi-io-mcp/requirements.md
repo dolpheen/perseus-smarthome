@@ -162,3 +162,4 @@ None for Milestone 1 implementation.
 - 2026-04-30: Set `uv` and `uv.lock` as dependency management, `config/rpi-io.toml` as GPIO config, and `.env` as gitignored local Raspberry Pi access configuration.
 - 2026-04-30: Added headless Raspberry Pi LAN discovery tool requirement using SSH probing and safe local `.env` updates.
 - 2026-04-30: Set pytest as the project test runner.
+- 2026-04-30: Owner approved Milestone 1 requirements (issue `#1` closed). Status flipped to Approved.
