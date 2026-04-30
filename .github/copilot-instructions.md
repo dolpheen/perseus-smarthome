@@ -4,8 +4,8 @@ Read `AGENTS.md` before making changes. This repository uses Specification-Drive
 
 Current implementation scope:
 
-- Milestone 1 is drafted but not approved yet. Do not start implementation until GitHub issue `#1` is closed.
-- The planned Milestone 1 scope is Raspberry Pi I/O MCP server only.
+- Milestone 1 is approved (issue `#1` closed 2026-04-30). Implementation issues `#2`–`#9` are the work units.
+- Milestone 1 scope is Raspberry Pi I/O MCP server only.
 - No LLM agent implementation in Milestone 1.
 - Target board is Raspberry Pi 2 on Raspberry Pi OS Lite 32-bit based on Debian Trixie.
 - Runtime is Python 3.13, package manager is `uv`, and `uv.lock` must be committed.
@@ -25,7 +25,7 @@ Work from the assigned GitHub issue only. Keep changes surgical, do not refactor
 
 For each PR:
 
-- Mention the GitHub issue implemented.
+- **The PR body MUST contain `Closes #<N>`** (or `Fixes #<N>` / `Resolves #<N>`) referencing the GitHub issue you are implementing. This is how GitHub auto-closes the issue on merge and how the Claude reviewer locates the acceptance criteria. Without it the reviewer flags a Blocking finding and the issue stays open after merge.
 - List the specs read.
 - List files changed.
 - Run the issue's `Verify` commands where possible.
