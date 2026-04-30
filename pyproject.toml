@@ -21,6 +21,9 @@ dependencies = [
 # library. Run before `uv sync` on the Pi:
 #   sudo apt install -y libffi-dev python3-dev build-essential
 
+[project.scripts]
+rpi-io-mcp = "perseus_smarthome.server:main"
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
