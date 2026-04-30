@@ -1,0 +1,24 @@
+[Unit]
+Description=Raspberry Pi I/O MCP Server
+After=network.target
+
+[Service]
+Type=simple
+User=pi
+Group=gpio
+WorkingDirectory=/opt/raspberry-smarthome
+# Use the project-local uv venv so the binary works regardless of uv version.
+# Extend PATH to cover the common uv install locations for the pi user.
+Environment="PATH=/home/pi/.local/bin:/usr/local/bin:/usr/bin:/bin"
+ExecStart=uv run rpi-io-mcp
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=rpi-io-mcp
+
+# Allow the service to inherit GPIO device access from the gpio group.
+# No special capabilities are required when the user is in the gpio group.
+
+[Install]
+WantedBy=multi-user.target
