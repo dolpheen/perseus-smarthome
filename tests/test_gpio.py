@@ -132,6 +132,20 @@ def test_read_input_unconfigured_pin_raises_wrong_direction():
     assert exc_info.value.code == "wrong_direction"
 
 
+def test_setup_input_invalid_pull_raises():
+    adapter = MockGPIOAdapter()
+    with pytest.raises(GPIOError) as exc_info:
+        adapter.setup_input(24, pull="sideways")
+    assert exc_info.value.code == "invalid_value"
+
+
+def test_set_mock_input_unregistered_pin_raises_wrong_direction():
+    adapter = MockGPIOAdapter()
+    with pytest.raises(GPIOError) as exc_info:
+        adapter.set_mock_input(24, 1)
+    assert exc_info.value.code == "wrong_direction"
+
+
 def test_read_input_from_output_pin_raises_wrong_direction():
     adapter = MockGPIOAdapter()
     adapter.setup_output(23)
