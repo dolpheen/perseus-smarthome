@@ -72,15 +72,21 @@ def main() -> None:
     from perseus_smarthome.devices import build_registry
     from perseus_smarthome.gpio import GPIOZeroAdapter
 
-    config = load_config()
-    registry = build_registry(config)
-    adapter = GPIOZeroAdapter()
-    service = GPIOService(registry, adapter)
-    mcp = create_server(service)
+    # Widen the try/finally to cover setup. If SIGTERM arrives during config
+    # load, registry build, adapter init, or service init, service.close()
+    # still runs whenever a service was constructed — so the GPIO adapter is
+    # released and GPIO23 cannot be left configured without a teardown path.
+    service: GPIOService | None = None
     try:
+        config = load_config()
+        registry = build_registry(config)
+        adapter = GPIOZeroAdapter()
+        service = GPIOService(registry, adapter)
+        mcp = create_server(service)
         mcp.run(transport="streamable-http")
     finally:
-        service.close()
+        if service is not None:
+            service.close()
 
 
 if __name__ == "__main__":

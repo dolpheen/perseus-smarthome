@@ -60,9 +60,14 @@ RSYNC_OPTS=(
 echo "==> Syncing project to ${SSH_TARGET}:${REMOTE_DIR}"
 # Ensure the remote directory exists and is owned by the deploy user
 ssh "${SSH_OPTS[@]}" "${SSH_TARGET}" \
-  "sudo mkdir -p '${REMOTE_DIR}' && sudo chown '${RPI_SSH_USER}:gpio' '${REMOTE_DIR}'"
+  "sudo mkdir -p '${REMOTE_DIR}' && sudo chown -R '${RPI_SSH_USER}:gpio' '${REMOTE_DIR}'"
 
 rsync "${RSYNC_OPTS[@]}" "${REPO_ROOT}/" "${SSH_TARGET}:${REMOTE_DIR}/"
+
+# Re-apply ownership recursively after rsync so files copied in pick up the
+# pi:gpio ownership the systemd unit expects.
+ssh "${SSH_OPTS[@]}" "${SSH_TARGET}" \
+  "sudo chown -R '${RPI_SSH_USER}:gpio' '${REMOTE_DIR}'"
 
 echo "==> Installing/updating Python dependencies on Pi"
 ssh "${SSH_OPTS[@]}" "${SSH_TARGET}" \

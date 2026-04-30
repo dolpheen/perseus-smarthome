@@ -13,6 +13,9 @@ Environment="PATH=/home/pi/.local/bin:/usr/local/bin:/usr/bin:/bin"
 ExecStart=uv run rpi-io-mcp
 Restart=on-failure
 RestartSec=5
+# Cap the SIGTERM-to-SIGKILL window so a hung asyncio shutdown cannot
+# silently bypass GPIO teardown for the systemd default 90s.
+TimeoutStopSec=10
 StandardOutput=journal
 StandardError=journal
 SyslogIdentifier=rpi-io-mcp
