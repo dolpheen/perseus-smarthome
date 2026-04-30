@@ -204,7 +204,7 @@ Expected structured result:
 - GPIO23 must be released or driven low during service shutdown when possible.
 - GPIO24 must be configured as input and must not be driven by the service.
 - Input reads must return integer `0` or `1`, not truthy strings.
-- Loopback testing must use current-limiting protection.
+- Loopback testing must avoid direct contention. A current-limiting resistor is preferred; a bare jumper is acceptable while `service.py` and the GPIO adapter enforce GPIO24 as input-only — any write to it returns `wrong_direction`, so misconfiguration requires a code-level regression rather than a wiring choice.
 - Relay coils must be driven through an appropriate relay module or driver circuit.
 - The first milestone assumes trusted LAN only; do not expose the service to the public internet.
 

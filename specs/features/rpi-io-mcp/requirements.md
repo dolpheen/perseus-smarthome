@@ -87,7 +87,7 @@ The canonical first test configuration uses BCM numbering, GPIO23 as the output 
 - GPIO pin numbering mode: BCM.
 - Output test pin: GPIO23.
 - Input test pin: GPIO24.
-- Loopback test wiring must avoid unsafe direct contention if a pin is misconfigured; use a current-limiting resistor for the test link.
+- Loopback test wiring must avoid unsafe direct contention if a pin is misconfigured. A current-limiting resistor between GPIO23 and GPIO24 is preferred; a bare jumper is acceptable because the service layer and GPIO adapter enforce GPIO24 as input-only (any write to it returns `wrong_direction`), so contention requires a code-level regression that the reviewer would block.
 - LED smoke wiring must include a current-limiting resistor.
 - Relay smoke wiring must use a relay module or driver circuit appropriate for Raspberry Pi GPIO; relay coils must not be connected directly to a GPIO pin.
 - GPIO inputs must not receive 5V.

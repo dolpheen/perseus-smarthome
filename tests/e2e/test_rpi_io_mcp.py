@@ -5,7 +5,8 @@ These tests connect to a real Raspberry Pi MCP server over streamable HTTP.
 Default run (no wiring required):
     RPI_MCP_URL=http://<raspberry-pi-ip>:8000/mcp uv run pytest tests/e2e/
 
-With GPIO23↔GPIO24 loopback wired through a current-limiting resistor:
+With GPIO23↔GPIO24 loopback (resistor preferred; bare jumper acceptable —
+see ``specs/features/rpi-io-mcp/design.md`` Safety Rules):
     RPI_MCP_URL=http://<raspberry-pi-ip>:8000/mcp uv run pytest tests/e2e/ --run-hardware
 
 Loopback tests are marked ``@pytest.mark.hardware`` and skipped by default
@@ -175,7 +176,7 @@ def test_loopback_high() -> None:
             assert read_result["ok"] is True, f"read_input failed: {read_result}"
             assert read_result["value"] == 1, (
                 f"Expected GPIO24 to read 1 after GPIO23 set high, got {read_result['value']}. "
-                "Check the loopback wiring (GPIO23 → resistor → GPIO24)."
+                "Check the GPIO23↔GPIO24 loopback wiring."
             )
         finally:
             # Reset GPIO23 to 0 so the pin is not left driven between
@@ -213,7 +214,7 @@ def test_loopback_low() -> None:
             assert read_result["ok"] is True, f"read_input failed: {read_result}"
             assert read_result["value"] == 0, (
                 f"Expected GPIO24 to read 0 after GPIO23 set low, got {read_result['value']}. "
-                "Check the loopback wiring (GPIO23 → resistor → GPIO24)."
+                "Check the GPIO23↔GPIO24 loopback wiring."
             )
         finally:
             # Reset GPIO23 to 0 even if an assertion above fails partway, so
