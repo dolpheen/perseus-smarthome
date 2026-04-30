@@ -1,6 +1,6 @@
 # Raspberry Pi I/O MCP Server Design
 
-Status: Draft
+Status: Approved
 Last reviewed: 2026-04-30  
 Owner: Vadim  
 Requirements: requirements.md
@@ -260,10 +260,11 @@ Required behavior:
 - Service runs as a non-root user that has GPIO permissions, if feasible.
 - The service process binds the HTTP MCP endpoint on the trusted LAN.
 
-## Open Design Questions
+## Resolved Design Decisions
 
-Pending owner review. The current draft proposes `0.0.0.0` on trusted LAN, with the MCP endpoint at `http://<raspberry-pi-ip>:8000/mcp`.
+- Listen address: `0.0.0.0` on trusted LAN, MCP endpoint at `http://<raspberry-pi-ip>:8000/mcp`. Approved 2026-04-30 with the rest of Milestone 1.
 
 ## Change Log
 
 - 2026-04-30: Clarified the proposed listen-address default as `0.0.0.0` on trusted LAN, pending owner review.
+- 2026-04-30: Owner approved the listen-address decision with the rest of Milestone 1 (issue `#1` closed). Section retitled "Resolved Design Decisions".
