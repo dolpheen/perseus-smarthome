@@ -47,12 +47,20 @@ def _result_dict(result: Any) -> dict[str, Any]:
     """Extract a structured dict from a CallToolResult.
 
     Prefers ``structuredContent`` (set by FastMCP for dict-returning tools)
-    and falls back to parsing the first TextContent block as JSON.
+    and falls back to parsing the first TextContent block as JSON. A non-JSON
+    fallback path produces a clear pytest failure rather than an opaque
+    ``json.JSONDecodeError`` traceback (IO-MCP-FR-010).
     """
     if result.structuredContent is not None:
         return result.structuredContent
     if result.content:
-        return json.loads(result.content[0].text)
+        text = result.content[0].text
+        try:
+            return json.loads(text)
+        except json.JSONDecodeError as exc:
+            pytest.fail(
+                f"MCP server returned non-JSON content in fallback path: {text!r} ({exc})"
+            )
     raise AssertionError(f"CallToolResult has no content: {result!r}")
 
 
@@ -153,19 +161,25 @@ def test_loopback_high() -> None:
     Spec: IO-MCP-FR-009, IO-MCP-FR-011.
     """
     async def _check(session):
-        set_result = _result_dict(
-            await session.call_tool("set_output", {"device_id": "gpio23_output", "value": 1})
-        )
-        assert set_result["ok"] is True, f"set_output high failed: {set_result}"
+        try:
+            set_result = _result_dict(
+                await session.call_tool("set_output", {"device_id": "gpio23_output", "value": 1})
+            )
+            assert set_result["ok"] is True, f"set_output high failed: {set_result}"
 
-        read_result = _result_dict(
-            await session.call_tool("read_input", {"device_id": "gpio24_input"})
-        )
-        assert read_result["ok"] is True, f"read_input failed: {read_result}"
-        assert read_result["value"] == 1, (
-            f"Expected GPIO24 to read 1 after GPIO23 set high, got {read_result['value']}. "
-            "Check the loopback wiring (GPIO23 → resistor → GPIO24)."
-        )
+            read_result = _result_dict(
+                await session.call_tool("read_input", {"device_id": "gpio24_input"})
+            )
+            assert read_result["ok"] is True, f"read_input failed: {read_result}"
+            assert read_result["value"] == 1, (
+                f"Expected GPIO24 to read 1 after GPIO23 set high, got {read_result['value']}. "
+                "Check the loopback wiring (GPIO23 → resistor → GPIO24)."
+            )
+        finally:
+            # Reset GPIO23 to 0 so the pin is not left driven between
+            # invocations. design.md Safety Rules require GPIO23 not stay
+            # active across runs.
+            await session.call_tool("set_output", {"device_id": "gpio23_output", "value": 0})
 
     _run(_check)
 
@@ -179,25 +193,30 @@ def test_loopback_low() -> None:
     Spec: IO-MCP-FR-009, IO-MCP-FR-011.
     """
     async def _check(session):
-        # Drive high first to ensure we're testing a transition.
-        setup_result = _result_dict(
-            await session.call_tool("set_output", {"device_id": "gpio23_output", "value": 1})
-        )
-        assert setup_result["ok"] is True, f"setup set_output high failed: {setup_result}"
+        try:
+            # Drive high first to ensure we're testing a transition.
+            setup_result = _result_dict(
+                await session.call_tool("set_output", {"device_id": "gpio23_output", "value": 1})
+            )
+            assert setup_result["ok"] is True, f"setup set_output high failed: {setup_result}"
 
-        set_result = _result_dict(
+            set_result = _result_dict(
+                await session.call_tool("set_output", {"device_id": "gpio23_output", "value": 0})
+            )
+            assert set_result["ok"] is True, f"set_output low failed: {set_result}"
+
+            read_result = _result_dict(
+                await session.call_tool("read_input", {"device_id": "gpio24_input"})
+            )
+            assert read_result["ok"] is True, f"read_input failed: {read_result}"
+            assert read_result["value"] == 0, (
+                f"Expected GPIO24 to read 0 after GPIO23 set low, got {read_result['value']}. "
+                "Check the loopback wiring (GPIO23 → resistor → GPIO24)."
+            )
+        finally:
+            # Reset GPIO23 to 0 even if an assertion above fails partway, so
+            # the pin is never left driven high across test invocations.
             await session.call_tool("set_output", {"device_id": "gpio23_output", "value": 0})
-        )
-        assert set_result["ok"] is True, f"set_output low failed: {set_result}"
-
-        read_result = _result_dict(
-            await session.call_tool("read_input", {"device_id": "gpio24_input"})
-        )
-        assert read_result["ok"] is True, f"read_input failed: {read_result}"
-        assert read_result["value"] == 0, (
-            f"Expected GPIO24 to read 0 after GPIO23 set low, got {read_result['value']}. "
-            "Check the loopback wiring (GPIO23 → resistor → GPIO24)."
-        )
 
     _run(_check)
 
