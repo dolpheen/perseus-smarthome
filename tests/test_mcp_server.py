@@ -9,8 +9,6 @@ from __future__ import annotations
 import asyncio
 from typing import Any
 
-import pytest
-
 from perseus_smarthome.config import load_config
 from perseus_smarthome.devices import build_registry
 from perseus_smarthome.gpio import MockGPIOAdapter
@@ -34,8 +32,14 @@ def _make_mcp():
 
 
 def _call(mcp, tool: str, args: dict[str, Any] | None = None) -> dict[str, Any]:
-    """Synchronously call a tool and return the structured result dict."""
+    """Synchronously call a tool and return the structured result dict.
+
+    FastMCP.call_tool() returns (TextContent_list, structured_dict) when the
+    tool's return type annotation is dict[str, Any].  The assertion below
+    guards against SDK shape changes that would silently make structured None.
+    """
     _, structured = asyncio.run(mcp.call_tool(tool, args or {}))
+    assert structured is not None, "FastMCP did not return a structured result; SDK shape may have changed"
     return structured
 
 
@@ -231,3 +235,15 @@ def test_read_input_tool_wrong_direction_returns_error() -> None:
     result = _call(mcp, "read_input", {"device_id": "gpio23_output"})
     assert result["ok"] is False
     assert result["error"] == "wrong_direction"
+
+
+# ---------------------------------------------------------------------------
+# server.main entry point
+# ---------------------------------------------------------------------------
+
+
+def test_main_is_callable() -> None:
+    """The rpi-io-mcp console script entry point must be a callable."""
+    import perseus_smarthome.server as server_module
+
+    assert callable(server_module.main)

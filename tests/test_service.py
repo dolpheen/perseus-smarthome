@@ -5,11 +5,9 @@ All tests use MockGPIOAdapter and do not require Raspberry Pi hardware.
 
 from __future__ import annotations
 
-import pytest
-
 from perseus_smarthome.config import load_config
 from perseus_smarthome.devices import build_registry
-from perseus_smarthome.gpio import MockGPIOAdapter
+from perseus_smarthome.gpio import GPIOAdapter, GPIOError, MockGPIOAdapter
 from perseus_smarthome.service import GPIOService
 
 
@@ -25,6 +23,50 @@ def _make_service() -> tuple[GPIOService, MockGPIOAdapter]:
     adapter = MockGPIOAdapter()
     service = GPIOService(registry, adapter)
     return service, adapter
+
+
+class HistoryMockAdapter(MockGPIOAdapter):
+    """MockGPIOAdapter that records every write_output call."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.write_history: list[tuple[int, int]] = []
+
+    def write_output(self, pin: int, value: int) -> None:
+        super().write_output(pin, value)
+        self.write_history.append((pin, value))
+
+
+def _make_service_with_history() -> tuple[GPIOService, HistoryMockAdapter]:
+    """Return a service backed by a HistoryMockAdapter."""
+    config = load_config()
+    registry = build_registry(config)
+    adapter = HistoryMockAdapter()
+    service = GPIOService(registry, adapter)
+    return service, adapter
+
+
+class FailingMockAdapter(GPIOAdapter):
+    """Adapter that raises GPIOError on write_output and read_input calls."""
+
+    def __init__(self, write_error_code: str, read_error_code: str) -> None:
+        self._write_error_code = write_error_code
+        self._read_error_code = read_error_code
+
+    def setup_output(self, pin: int, safe_default: int = 0) -> None:
+        pass
+
+    def setup_input(self, pin: int, pull: str = "down") -> None:
+        pass
+
+    def write_output(self, pin: int, value: int) -> None:
+        raise GPIOError(self._write_error_code, f"Simulated {self._write_error_code} on pin {pin}")
+
+    def read_input(self, pin: int) -> int:
+        raise GPIOError(self._read_error_code, f"Simulated {self._read_error_code} on pin {pin}")
+
+    def close(self) -> None:
+        pass
 
 
 # ---------------------------------------------------------------------------
@@ -178,6 +220,20 @@ def test_set_output_negative_value_returns_error() -> None:
     assert result["error"] == "invalid_value"
 
 
+def test_set_output_bool_true_returns_error() -> None:
+    service, _ = _make_service()
+    result = service.set_output("gpio23_output", True)  # type: ignore[arg-type]
+    assert result["ok"] is False
+    assert result["error"] == "invalid_value"
+
+
+def test_set_output_bool_false_returns_error() -> None:
+    service, _ = _make_service()
+    result = service.set_output("gpio23_output", False)  # type: ignore[arg-type]
+    assert result["ok"] is False
+    assert result["error"] == "invalid_value"
+
+
 # ---------------------------------------------------------------------------
 # read_input – success paths
 # ---------------------------------------------------------------------------
@@ -241,3 +297,66 @@ def test_close_releases_adapter() -> None:
     # After close, the mock adapter no longer knows about any pins.
     assert adapter._outputs == {}
     assert adapter._inputs == {}
+
+
+def test_close_resets_gpio23_low_before_releasing() -> None:
+    """GPIO23 must be driven low during service shutdown (design.md Safety Rules)."""
+    service, adapter = _make_service_with_history()
+    service.set_output("gpio23_output", 1)
+    service.close()
+    # The last recorded write to pin 23 before close() must be 0.
+    pin23_writes = [(pin, val) for pin, val in adapter.write_history if pin == 23]
+    assert pin23_writes, "Expected at least one write to pin 23 during close()"
+    assert pin23_writes[-1] == (23, 0), f"Expected final write to pin 23 to be 0, got {pin23_writes[-1]}"
+
+
+# ---------------------------------------------------------------------------
+# GPIO adapter failure – set_output
+# ---------------------------------------------------------------------------
+
+
+def _make_service_with_failing_adapter(
+    write_code: str = "hardware_error",
+    read_code: str = "hardware_error",
+) -> GPIOService:
+    config = load_config()
+    registry = build_registry(config)
+    adapter = FailingMockAdapter(write_code, read_code)
+    return GPIOService(registry, adapter)
+
+
+def test_set_output_hardware_error_returns_structured_error() -> None:
+    service = _make_service_with_failing_adapter(write_code="hardware_error")
+    result = service.set_output("gpio23_output", 1)
+    assert result["ok"] is False
+    assert result["error"] == "hardware_error"
+    assert "message" in result
+
+
+def test_set_output_gpio_unavailable_returns_structured_error() -> None:
+    service = _make_service_with_failing_adapter(write_code="gpio_unavailable")
+    result = service.set_output("gpio23_output", 1)
+    assert result["ok"] is False
+    assert result["error"] == "gpio_unavailable"
+    assert "message" in result
+
+
+# ---------------------------------------------------------------------------
+# GPIO adapter failure – read_input
+# ---------------------------------------------------------------------------
+
+
+def test_read_input_hardware_error_returns_structured_error() -> None:
+    service = _make_service_with_failing_adapter(read_code="hardware_error")
+    result = service.read_input("gpio24_input")
+    assert result["ok"] is False
+    assert result["error"] == "hardware_error"
+    assert "message" in result
+
+
+def test_read_input_gpio_unavailable_returns_structured_error() -> None:
+    service = _make_service_with_failing_adapter(read_code="gpio_unavailable")
+    result = service.read_input("gpio24_input")
+    assert result["ok"] is False
+    assert result["error"] == "gpio_unavailable"
+    assert "message" in result

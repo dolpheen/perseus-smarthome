@@ -27,7 +27,10 @@ class GPIOService:
             if device.kind == "output":
                 self._adapter.setup_output(device.pin, safe_default=device.safe_default)
             else:
-                self._adapter.setup_input(device.pin, pull=device.pull or "down")
+                self._adapter.setup_input(
+                    device.pin,
+                    pull=device.pull if device.pull is not None else "down",
+                )
 
     def health(self) -> dict[str, Any]:
         """Return service health and runtime details."""
@@ -54,7 +57,7 @@ class GPIOService:
         Returns a structured result dict.  On error, includes ``ok: false``,
         ``error`` (error code), and ``message``.
         """
-        if value not in (0, 1):
+        if isinstance(value, bool) or value not in (0, 1):
             return {
                 "ok": False,
                 "error": "invalid_value",
@@ -89,5 +92,11 @@ class GPIOService:
         return {"device_id": device_id, "value": value, "ok": True}
 
     def close(self) -> None:
-        """Release all GPIO resources."""
+        """Reset outputs to safe defaults and release all GPIO resources."""
+        for device in self._registry.list_devices():
+            if device.kind == "output":
+                try:
+                    self._adapter.write_output(device.pin, 0)
+                except Exception:
+                    pass
         self._adapter.close()
