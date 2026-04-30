@@ -267,7 +267,70 @@ Required behavior:
 
 - Listen address: `0.0.0.0` on trusted LAN, MCP endpoint at `http://<raspberry-pi-ip>:8000/mcp`. Approved 2026-04-30 with the rest of Milestone 1.
 
+## Decisions Discovered During Implementation
+
+These were not in the original approved spec; they surfaced during Milestone 1
+implementation and hardware verification on 2026-04-30/2026-05-01 and are
+recorded here per the issue #9 closeout requirement to capture work-discovered
+decisions.
+
+- **Loopback wiring relaxed to allow a bare jumper.** Original spec (this file
+  and `requirements.md:90`) required a current-limiting resistor on the
+  GPIO23↔GPIO24 link. Owner-approved revision in PR #35: a bare jumper is also
+  acceptable, because contention safety is upheld at the software level —
+  `service.py` and the GPIO adapter both reject any write to a device with
+  `kind: input`, so misconfiguration that could create CMOS-driver contention
+  requires a code-level regression rather than a wiring choice. The resistor
+  remains the recommended option; the jumper unblocks operators without one.
+- **systemd unit User= is templated at install time.** Default Raspbian
+  installs use a `pi` user (UID 1000), but Bookworm-and-later installers
+  prompt for an arbitrary username, and operators sometimes rename the
+  primary user. The unit file in `deploy/systemd/rpi-io-mcp.service` keeps
+  `User=pi` as the canonical default; `scripts/deploy_rpi_io_mcp.sh`
+  sed-substitutes `User=pi` and `/home/pi/` paths to match `RPI_SSH_USER`
+  before installing into `/etc/systemd/system/`. Avoids an opaque
+  status=203/EXEC failure when the deploy user isn't `pi`. Documented in
+  `docs/deployment.md`.
+- **systemd ExecStart uses an absolute path to `uv`.** systemd's ExecStart
+  binary lookup uses its own internal PATH and does not consult the unit's
+  `Environment="PATH=..."` line; a relative `uv run rpi-io-mcp` failed with
+  status=203/EXEC when uv was installed under `~/.local/bin` (the default for
+  pipx-installed uv). The unit now invokes
+  `/home/pi/.local/bin/uv run --no-dev rpi-io-mcp`, sed-substituted at
+  install time. The `--no-dev` matches `uv sync --no-dev` in the deploy
+  script so dev dependencies are not silently re-synced on first start.
+- **SIGTERM handler in `server.py:main()`.** systemd's default behavior
+  terminates the process on `systemctl stop`/`restart` without running
+  Python `finally` blocks. Without explicit handling, `service.close()`
+  would not run and GPIO23 could remain at its last driven value until the
+  next service start. `main()` now installs a SIGTERM handler that raises
+  `SystemExit(0)`, which propagates through `try/finally` and ensures
+  `service.close()` drives outputs low. `TimeoutStopSec=10` in the unit
+  caps the SIGTERM-to-SIGKILL window so a hung shutdown cannot silently
+  bypass GPIO teardown. The setup block is wrapped in the same try/finally
+  so that a SIGTERM during config load or adapter init still releases the
+  adapter.
+- **Partial-init cleanup in `GPIOService.__init__`.** If `_init_pins`
+  succeeds for GPIO23 but raises for GPIO24, `__init__` now best-effort
+  calls `self.close()` before re-raising so GPIO23 is not left configured
+  without a teardown path. design.md Safety Rules require GPIO23 not stay
+  driven without a release path on shutdown; this extends that discipline
+  to partial-init failures.
+- **E2E hardware tests skipped by default; `--run-hardware` opts in.**
+  `tests/e2e/conftest.py` auto-skips `@pytest.mark.hardware` tests unless
+  the operator passes `--run-hardware`. Lets `uv run pytest tests/e2e/`
+  succeed when the operator only has the server reachable but no loopback
+  wiring; the loopback tests still gate Milestone 1 acceptance when the
+  jumper is present.
+- **Apt prerequisites for `lgpio` source build are wider than originally
+  documented.** `pyproject.toml`'s comment listed `libffi-dev`,
+  `python3-dev`, and `build-essential`. Source-building `lgpio` on armv7l
+  also needs **`swig`** (codegen) and **`liblgpio-dev`** (system C library
+  to link against). `docs/deployment.md` Prerequisites now includes both;
+  see Change Log there.
+
 ## Change Log
 
 - 2026-04-30: Clarified the proposed listen-address default as `0.0.0.0` on trusted LAN, pending owner review.
 - 2026-04-30: Owner approved the listen-address decision with the rest of Milestone 1 (issue `#1` closed). Section retitled "Resolved Design Decisions".
+- 2026-05-01: Implementation landed (#32, #35, #36, #38). Added "Decisions Discovered During Implementation" section capturing the loopback-wiring revision, systemd User= templating, absolute uv ExecStart, SIGTERM handler, partial-init cleanup, hardware-skip conftest, and the wider apt prereq list. Status remains Approved pending Pi reboot persistence and Codex MCP smoke per `tasks.md` task 10.
