@@ -97,6 +97,6 @@ class GPIOService:
             if device.kind == "output":
                 try:
                     self._adapter.write_output(device.pin, 0)
-                except Exception:
+                except GPIOError:
                     pass
         self._adapter.close()
