@@ -36,14 +36,14 @@ Before implementation, read:
 
 ## Current Status
 
-Milestone 1 implementation is not approved yet. The owner still needs to review the specs.
+Milestone 1 specs are approved. Implementation is in progress.
 
-GitHub issue `#1`, "Approve Milestone 1 Raspberry Pi I/O MCP specs", is the active gate. Do not start implementation until `#1` is closed. After approval, use GitHub issue `#2`, "Scaffold Python project with uv and dependencies", as the first implementation task. GitHub issues `#2` through `#9` have native issue Relationships configured from their `Blocked by:` notes.
+GitHub issue `#2`, "Scaffold Python project with uv and dependencies", is the first implementation task. GitHub issues `#2` through `#9` have native issue Relationships configured from their `Blocked by:` notes; only start an issue whose blockers are closed.
 
 Already created:
 
 - SDD workflow and specs.
-- Draft Milestone 1 Raspberry Pi I/O MCP requirements, design, and task plan.
+- Approved Milestone 1 Raspberry Pi I/O MCP requirements, design, and task plan.
 - GitHub implementation issues `#1` through `#9`.
 - Claude Code reviewer workflows and repository review guidance.
 - CI workflow running `pytest` on pull requests and pushes to `main`.
@@ -75,17 +75,18 @@ Not implemented yet:
 
 ## What To Do Next
 
-First review and approve `specs/features/rpi-io-mcp/requirements.md`, `specs/features/rpi-io-mcp/design.md`, and `specs/features/rpi-io-mcp/tasks.md`. Then follow `specs/features/rpi-io-mcp/tasks.md` and GitHub issue Relationships in order.
+Follow `specs/features/rpi-io-mcp/tasks.md` and GitHub issue Relationships in order.
 
 Recommended next implementation plan:
 
-1. Close issue `#1` after owner approval.
-2. Implement issue `#2`: scaffold Python project with `uv` -> verify: `uv run pytest` works.
-3. Implement config/device registry -> verify: unit tests for `config/rpi-io.toml` and wrong-device cases.
-4. Implement GPIO adapter boundary and mock adapter -> verify: unit tests without Raspberry Pi hardware.
-5. Implement MCP HTTP server tools -> verify: unit tests for `health`, `list_devices`, `set_output`, `read_input`.
-6. Add E2E tests -> verify: command accepts `RPI_MCP_URL`.
-7. Add systemd/deploy docs/scripts -> verify: static review locally, runtime check later on Pi.
+1. Implement issue `#2`: scaffold Python project with `uv` -> verify: `uv run pytest` works.
+2. Implement config/device registry (`#3`) -> verify: unit tests for `config/rpi-io.toml` and wrong-device cases.
+3. Implement GPIO adapter boundary and mock adapter (`#4`) -> verify: unit tests without Raspberry Pi hardware.
+4. Implement MCP HTTP server tools (`#5`) -> verify: unit tests for `health`, `list_devices`, `set_output`, `read_input`.
+5. Add E2E tests (`#6`) -> verify: command accepts `RPI_MCP_URL`.
+6. Add systemd/deploy docs/scripts (`#7`) -> verify: static review locally, runtime check later on Pi.
+7. Document manual smoke tests (`#8`) -> verify: docs land and a smoke run on the Pi succeeds.
+8. Close out specs (`#9`) -> move spec statuses from `Approved` to `Implemented` after acceptance criteria are verified.
 
 Full acceptance later requires the Raspberry Pi to be connected and wired:
 

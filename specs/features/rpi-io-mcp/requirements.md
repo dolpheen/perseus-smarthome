@@ -1,6 +1,6 @@
 # Raspberry Pi I/O MCP Server
 
-Status: Draft
+Status: Approved
 Last reviewed: 2026-04-30  
 Owner: Vadim  
 Parent spec: ../../project.spec.md  
