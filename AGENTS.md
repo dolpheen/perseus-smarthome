@@ -28,6 +28,7 @@ Target:
 Before implementation, read:
 
 - `docs/sdd-workflow.md`
+- `docs/agent-pr-workflow.md`
 - `specs/project.spec.md`
 - `specs/features/rpi-io-mcp/requirements.md`
 - `specs/features/rpi-io-mcp/design.md`
@@ -46,6 +47,7 @@ Already created:
 - GitHub implementation issues `#1` through `#9`.
 - Claude Code reviewer workflows and repository review guidance.
 - CI workflow running `pytest` on pull requests and pushes to `main`.
+- Auto-merge workflow gated on `pytest` + `claude-review`, opt-out via `critical`, `needs-manual-verification`, or `do-not-merge` labels on the PR or any linked issue. See `docs/agent-pr-workflow.md`.
 - `.gitignore`
 - `.env.example`
 - `config/rpi-io.toml`
