@@ -20,8 +20,13 @@ runtime templating of paths).
 1. Install build dependencies required by native packages (`cffi`, `lgpio`):
 
    ```bash
-   sudo apt install -y libffi-dev python3-dev build-essential
+   sudo apt install -y libffi-dev python3-dev build-essential swig liblgpio-dev
    ```
+
+   `swig` is the codegen step in the `lgpio` source build; `liblgpio-dev`
+   provides the C library + headers it links against. Skipping either one
+   causes `uv sync` to fail with a swig-not-found or `cannot find -llgpio`
+   error during the lgpio build on armv7l.
 
 2. Install `uv`:
 

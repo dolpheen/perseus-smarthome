@@ -1,11 +1,11 @@
 # Raspberry Pi I/O MCP Server
 
 Status: Approved
-Last reviewed: 2026-04-30  
+Last reviewed: 2026-05-01  
 Owner: Vadim  
 Parent spec: ../../project.spec.md  
-Related code: ../../../config/rpi-io.toml; ../../../tools/find_raspberry.py; implementation TBD  
-Related tests: ../../../tests/test_find_raspberry.py; implementation tests TBD
+Related code: ../../../config/rpi-io.toml; ../../../pyproject.toml; ../../../src/perseus_smarthome/config.py; ../../../src/perseus_smarthome/devices.py; ../../../src/perseus_smarthome/gpio.py; ../../../src/perseus_smarthome/service.py; ../../../src/perseus_smarthome/server.py; ../../../deploy/systemd/rpi-io-mcp.service; ../../../scripts/deploy_rpi_io_mcp.sh; ../../../docs/deployment.md; ../../../docs/manual-smoke-tests.md; ../../../tools/find_raspberry.py; ../../../tools/smoke_meter.py  
+Related tests: ../../../tests/test_config.py; ../../../tests/test_devices.py; ../../../tests/test_gpio.py; ../../../tests/test_service.py; ../../../tests/test_mcp_server.py; ../../../tests/test_find_raspberry.py; ../../../tests/e2e/test_rpi_io_mcp.py
 
 ## Summary
 
@@ -163,3 +163,4 @@ None for Milestone 1 implementation.
 - 2026-04-30: Added headless Raspberry Pi LAN discovery tool requirement using SSH probing and safe local `.env` updates.
 - 2026-04-30: Set pytest as the project test runner.
 - 2026-04-30: Owner approved Milestone 1 requirements (issue `#1` closed). Status flipped to Approved.
+- 2026-05-01: Implementation landed across PRs #32 (#5), #35 (#6), #36 (#7), and #38 (#8). Related code and Related tests fields populated. Loopback wiring constraint (line 90) revised in PR #35 to permit a bare jumper alongside the preferred current-limiting resistor — the safety guarantee comes from the device-direction enforcement in `service.py` and the GPIO adapter, not from the wiring choice. Status remains Approved; flips to Implemented after Pi reboot persistence and Codex MCP smoke are verified per `tasks.md` task 10.

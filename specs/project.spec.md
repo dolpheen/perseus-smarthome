@@ -1,10 +1,10 @@
 # Raspberry Pi Smart Home LLM Control
 
 Status: Approved
-Last reviewed: 2026-04-30  
+Last reviewed: 2026-05-01  
 Owner: Vadim  
-Related code: config/rpi-io.toml; tools/find_raspberry.py; implementation TBD  
-Related tests: tests/test_find_raspberry.py; implementation tests TBD
+Related code: config/rpi-io.toml; pyproject.toml; src/perseus_smarthome/config.py; src/perseus_smarthome/devices.py; src/perseus_smarthome/gpio.py; src/perseus_smarthome/service.py; src/perseus_smarthome/server.py; deploy/systemd/rpi-io-mcp.service; scripts/deploy_rpi_io_mcp.sh; tools/find_raspberry.py; tools/smoke_meter.py  
+Related tests: tests/test_config.py; tests/test_devices.py; tests/test_gpio.py; tests/test_service.py; tests/test_mcp_server.py; tests/test_find_raspberry.py; tests/e2e/test_rpi_io_mcp.py
 
 ## Summary
 
@@ -126,3 +126,4 @@ The following questions are future-scope and do not block Milestone 1 Raspberry 
 - 2026-04-30: Set pytest as the project test runner.
 - 2026-04-30: Clarified that future CC2531 and broader smart home questions are expected to be non-blocking for Milestone 1, pending owner review.
 - 2026-04-30: Owner approved project scope and Milestone 1 (issue `#1` closed). Status flipped to Approved.
+- 2026-05-01: Milestone 1 implementation merged (#32, #35, #36, #38). Related code and Related tests fields filled with the implemented files. Project status remains Approved pending Milestone 1 final verification (Pi reboot + Codex MCP smoke); see `specs/features/rpi-io-mcp/tasks.md` task 10.
