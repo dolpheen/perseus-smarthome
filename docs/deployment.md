@@ -5,8 +5,9 @@ Raspberry Pi OS Lite 32-bit (Debian Trixie).
 
 Hardware target: Raspberry Pi 2.  
 Service user: `pi` (must be in the `gpio` group).  
-Project directory on Pi: `/opt/raspberry-smarthome` (or the value of
-`RPI_PROJECT_DIR` in your local `.env`).
+Project directory on Pi: `/opt/raspberry-smarthome` (fixed; not configurable via
+`RPI_PROJECT_DIR` so the systemd unit, deploy script, and docs all agree without
+any runtime templating).
 
 ## Prerequisites
 
