@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from perseus_smarthome.config import load_config
+from perseus_smarthome.config import load_config, ConfigError
 from perseus_smarthome.devices import Device, DeviceError, DeviceRegistry, build_registry
 
 
@@ -133,7 +133,7 @@ def test_build_registry_rejects_unknown_device_kind() -> None:
         "gpio": {"numbering": "BCM"},
         "devices": [{"id": "mystery", "name": "Mystery", "kind": "sensor", "pin": 5}],
     }
-    with pytest.raises(ValueError, match="Unsupported device kind"):
+    with pytest.raises(ConfigError, match="Unsupported device kind"):
         build_registry(config)
 
 

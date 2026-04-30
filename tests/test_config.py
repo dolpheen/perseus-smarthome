@@ -108,3 +108,113 @@ def test_load_config_accepts_bcm_numbering(tmp_path: Path) -> None:
     )
     data = load_config(cfg)
     assert data["gpio"]["numbering"] == "BCM"
+
+
+def test_load_config_rejects_device_missing_id(tmp_path: Path) -> None:
+    cfg = tmp_path / "rpi-io.toml"
+    cfg.write_text(
+        textwrap.dedent("""\
+            [gpio]
+            numbering = "BCM"
+
+            [[devices]]
+            name = "GPIO23 Output"
+            kind = "output"
+            pin = 23
+        """),
+        encoding="utf-8",
+    )
+    with pytest.raises(ConfigError, match="missing required field 'id'"):
+        load_config(cfg)
+
+
+def test_load_config_rejects_device_missing_name(tmp_path: Path) -> None:
+    cfg = tmp_path / "rpi-io.toml"
+    cfg.write_text(
+        textwrap.dedent("""\
+            [gpio]
+            numbering = "BCM"
+
+            [[devices]]
+            id = "gpio23_output"
+            kind = "output"
+            pin = 23
+        """),
+        encoding="utf-8",
+    )
+    with pytest.raises(ConfigError, match="missing required field 'name'"):
+        load_config(cfg)
+
+
+def test_load_config_rejects_device_missing_kind(tmp_path: Path) -> None:
+    cfg = tmp_path / "rpi-io.toml"
+    cfg.write_text(
+        textwrap.dedent("""\
+            [gpio]
+            numbering = "BCM"
+
+            [[devices]]
+            id = "gpio23_output"
+            name = "GPIO23 Output"
+            pin = 23
+        """),
+        encoding="utf-8",
+    )
+    with pytest.raises(ConfigError, match="missing required field 'kind'"):
+        load_config(cfg)
+
+
+def test_load_config_rejects_device_missing_pin(tmp_path: Path) -> None:
+    cfg = tmp_path / "rpi-io.toml"
+    cfg.write_text(
+        textwrap.dedent("""\
+            [gpio]
+            numbering = "BCM"
+
+            [[devices]]
+            id = "gpio23_output"
+            name = "GPIO23 Output"
+            kind = "output"
+        """),
+        encoding="utf-8",
+    )
+    with pytest.raises(ConfigError, match="missing required field 'pin'"):
+        load_config(cfg)
+
+
+def test_load_config_rejects_device_non_integer_pin(tmp_path: Path) -> None:
+    cfg = tmp_path / "rpi-io.toml"
+    cfg.write_text(
+        textwrap.dedent("""\
+            [gpio]
+            numbering = "BCM"
+
+            [[devices]]
+            id = "gpio23_output"
+            name = "GPIO23 Output"
+            kind = "output"
+            pin = "23"
+        """),
+        encoding="utf-8",
+    )
+    with pytest.raises(ConfigError, match="non-integer pin"):
+        load_config(cfg)
+
+
+def test_load_config_rejects_device_unsupported_kind(tmp_path: Path) -> None:
+    cfg = tmp_path / "rpi-io.toml"
+    cfg.write_text(
+        textwrap.dedent("""\
+            [gpio]
+            numbering = "BCM"
+
+            [[devices]]
+            id = "gpio23_output"
+            name = "GPIO23 Output"
+            kind = "sensor"
+            pin = 23
+        """),
+        encoding="utf-8",
+    )
+    with pytest.raises(ConfigError, match="Unsupported device kind"):
+        load_config(cfg)

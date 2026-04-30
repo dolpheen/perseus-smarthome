@@ -5,6 +5,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Literal
 
+from perseus_smarthome.config import ConfigError
+
 DeviceKind = Literal["output", "input"]
 
 _CAPABILITIES: dict[str, list[str]] = {
@@ -85,7 +87,7 @@ def build_registry(config: dict[str, Any]) -> DeviceRegistry:
     for raw in raw_devices:
         kind = raw["kind"]
         if kind not in _SUPPORTED_KINDS:
-            raise ValueError(
+            raise ConfigError(
                 f"Unsupported device kind '{kind}' for device '{raw.get('id')}'; "
                 f"expected one of: {sorted(_SUPPORTED_KINDS)}."
             )
