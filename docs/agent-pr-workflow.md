@@ -10,7 +10,7 @@ How issues turn into merged code in this repo. Read this before opening a PR.
 4. **Checks** — two required checks run automatically:
    - `pytest` — runs `uv run pytest -m "not e2e and not hardware"` on Python 3.13.
    - `claude-review` — runs the Claude Code reviewer using `CLAUDE.md` as the rubric.
-5. **Merge** — the auto-merge workflow squash-merges the PR and deletes the branch when both checks pass and no opt-out label is set on the PR or any linked issue.
+5. **Merge** — the auto-merge workflow squash-merges the PR and deletes the branch when both checks pass and no opt-out label is set on the PR or any linked issue. It re-evaluates automatically when `CI` or `Claude Code Review` completes (via `workflow_run`), so a green PR merges without any manual nudge.
 
 ## Opt-out Labels
 
