@@ -321,7 +321,7 @@ version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "gpiozero" },
-    { name = "lgpio", marker = "sys_platform == 'linux'" },
+    { name = "lgpio", marker = "platform_machine in 'armv6l armv7l aarch64' and sys_platform == 'linux'" },
     { name = "mcp" },
 ]
 
@@ -333,7 +333,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "gpiozero", specifier = ">=2.0" },
-    { name = "lgpio", marker = "sys_platform == 'linux'", specifier = ">=0.2" },
+    { name = "lgpio", marker = "platform_machine in 'armv6l armv7l aarch64' and sys_platform == 'linux'", specifier = ">=0.2" },
     { name = "mcp", specifier = ">=1.0,<2" },
 ]
 
