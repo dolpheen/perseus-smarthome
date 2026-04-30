@@ -14,6 +14,7 @@ permissions:
   issues: read
   checks: read
   statuses: read
+  actions: read
 
 concurrency:
   group: auto-merge-${{ github.event.pull_request.number || github.event.check_suite.head_sha }}
@@ -76,14 +77,18 @@ jobs:
 
           owner="${REPO%/*}"
           name="${REPO#*/}"
-          issue_labels=$(gh api graphql -f query="
+          if ! issue_labels=$(gh api graphql -f query="
             query { repository(owner:\"$owner\", name:\"$name\") {
               pullRequest(number:$PR_NUMBER) {
                 closingIssuesReferences(first:10) {
                   nodes { labels(first:30) { nodes { name } } }
                 }
               }
-            }}" --jq '.data.repository.pullRequest.closingIssuesReferences.nodes[].labels.nodes[].name' || true)
+            }}" --jq '.data.repository.pullRequest.closingIssuesReferences.nodes[].labels.nodes[].name'); then
+            echo "GraphQL call for linked-issue labels failed; failing closed"
+            echo "merge=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
 
           while IFS= read -r label; do
             [[ -z "$label" ]] && continue
