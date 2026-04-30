@@ -68,6 +68,7 @@ The first implementation milestone is MCP-only Raspberry Pi I/O control. LLM age
 - Runtime: first milestone target OS is Raspberry Pi OS Lite 32-bit based on Debian Trixie.
 - Runtime: first milestone implementation language is Python.
 - Runtime: first milestone target Python version is Python 3.13 from Debian Trixie, with the MCP Python SDK requirement of Python 3.10+ as the lower bound.
+- Testing: pytest is the project test runner.
 - Developer workflow: a MacBook-side LAN discovery tool must help find the headless Raspberry Pi by probing SSH candidates.
 - Safety: the agent must not be able to toggle arbitrary GPIO pins or unregistered devices.
 - Safety: first milestone output state must reset to low/off after service restart or Raspberry Pi reboot.
@@ -95,6 +96,7 @@ The first implementation milestone is MCP-only Raspberry Pi I/O control. LLM age
 ## Verification
 
 - Unit tests for MCP tool schemas, device registry behavior, permission checks, and error responses.
+- Local tests run through pytest.
 - Integration tests or smoke tests for Raspberry Pi I/O on the Raspberry Pi 2.
 - End-to-end MCP loopback tests from a MacBook that turn GPIO23 on/off and verify GPIO24 reads `1` and `0`.
 - Manual smoke tests with GPIO23 output and GPIO24 input, including LED/relay output verification by meter or direct observation.
@@ -119,3 +121,4 @@ The first implementation milestone is MCP-only Raspberry Pi I/O control. LLM age
 - 2026-04-30: Set first milestone runtime to Raspberry Pi OS Lite 32-bit based on Debian Trixie and Python 3.13.
 - 2026-04-30: Set `uv` as the default package manager, `config/rpi-io.toml` as first milestone GPIO config, and `.env` as gitignored local Raspberry Pi access configuration.
 - 2026-04-30: Added MacBook-side headless Raspberry Pi LAN discovery tool based on SSH probing.
+- 2026-04-30: Set pytest as the project test runner.

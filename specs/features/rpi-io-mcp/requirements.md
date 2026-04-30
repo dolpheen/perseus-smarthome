@@ -104,6 +104,7 @@ The canonical first test configuration uses BCM numbering, GPIO23 as the output 
 - MCP SDK runtime lower bound: Python 3.10+.
 - Package manager: `uv`.
 - Dependency lock: `uv.lock`.
+- Test runner: pytest.
 - GPIO configuration: `config/rpi-io.toml`.
 
 ## Interfaces
@@ -144,6 +145,7 @@ The canonical first test configuration uses BCM numbering, GPIO23 as the output 
 - Negative test: attempt to access a disallowed pin and verify rejection.
 - Separate manual Codex smoke test: register the HTTP MCP URL with Codex, start a new Codex session, list or invoke safe I/O tools, and do not treat this as a substitute for automated E2E tests.
 - Unit test: LAN discovery helper parsing and `.env` update logic.
+- Unit tests must run through pytest.
 - Manual discovery test: connect the Raspberry Pi to LAN, run `python3 tools/find_raspberry.py --subnet <lan-cidr>`, and verify the correct SSH candidate is reported.
 - Manual discovery env test: run `python3 tools/find_raspberry.py --subnet <lan-cidr> --select <ip> --update-env` and verify only local `.env` host fields are updated.
 
@@ -159,3 +161,4 @@ None for Milestone 1 implementation.
 - 2026-04-30: Set first milestone runtime to Raspberry Pi OS Lite 32-bit based on Debian Trixie, Python 3.13, GPIO Zero, and a canonical MacBook E2E test command.
 - 2026-04-30: Set `uv` and `uv.lock` as dependency management, `config/rpi-io.toml` as GPIO config, and `.env` as gitignored local Raspberry Pi access configuration.
 - 2026-04-30: Added headless Raspberry Pi LAN discovery tool requirement using SSH probing and safe local `.env` updates.
+- 2026-04-30: Set pytest as the project test runner.

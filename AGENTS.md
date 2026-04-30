@@ -14,6 +14,7 @@ Target:
 - OS: Raspberry Pi OS Lite 32-bit based on Debian Trixie.
 - Runtime: Python 3.13.
 - Package manager: `uv`; commit `uv.lock`.
+- Test runner: `pytest`.
 - MCP transport: streamable HTTP over trusted LAN.
 - Service manager: systemd.
 - GPIO numbering: BCM.
@@ -48,7 +49,7 @@ Already created:
 Verified:
 
 ```bash
-python3 -m unittest tests/test_find_raspberry.py
+python3 -m pytest tests/test_find_raspberry.py
 python3 -m py_compile tools/find_raspberry.py tests/test_find_raspberry.py
 python3 tools/find_raspberry.py --help
 ```

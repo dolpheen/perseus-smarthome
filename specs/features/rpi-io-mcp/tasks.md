@@ -26,7 +26,7 @@ This milestone is complete when:
 - Commit `uv.lock`.
 - Add MCP Python SDK dependency.
 - Add GPIO dependency strategy for Raspberry Pi runtime and mock tests.
-- Add test dependencies.
+- Add pytest as the test dependency.
 
 2. Device registry
 
@@ -91,6 +91,7 @@ RPI_MCP_URL=http://<raspberry-pi-ip>:8000/mcp uv run pytest tests/e2e/test_rpi_i
 - Implement `tools/find_raspberry.py`.
 - Support hostname lookup, explicit subnet scanning, SSH probing, ARP/MAC enrichment, JSON output, and safe `.env` updates.
 - Add unit tests for discovery helper parsing and `.env` update logic.
+- Ensure discovery tests run through pytest.
 - Document discovery command:
 
 ```bash

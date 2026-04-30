@@ -1,0 +1,18 @@
+[project]
+name = "perseus-smarthome"
+version = "0.1.0"
+description = "Raspberry Pi smart home MCP control project."
+requires-python = ">=3.13"
+dependencies = []
+
+[dependency-groups]
+dev = [
+  "pytest>=8.0",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+  "e2e: tests that require a reachable Raspberry Pi MCP server",
+  "hardware: tests that require Raspberry Pi GPIO wiring",
+]

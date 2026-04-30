@@ -16,6 +16,7 @@ Implement a Python MCP server that runs on Raspberry Pi 2, exposes a small GPIO 
 - Python: 3.13 from Debian Trixie.
 - Package manager: `uv`.
 - Dependency lock file: `uv.lock`.
+- Test runner: pytest.
 - MCP SDK: official Python SDK, v1.x/stable line.
 - GPIO access: GPIO Zero behind an internal adapter interface.
 - Service manager: systemd.
