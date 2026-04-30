@@ -31,3 +31,4 @@ For each PR:
 - Run the issue's `Verify` commands where possible.
 - If hardware verification cannot run, say so explicitly and keep unit tests hardware-free.
 - Preserve Raspberry Pi safety constraints: no arbitrary GPIO access, no 5V on GPIO inputs, GPIO23 resets low/off on service start, and GPIO24 is input-only.
+- When asked for fix commits, address both the Claude reviewer's punch list and any substantive `copilot-pull-request-reviewer[bot]` inline review comments in the same push, so round 2 sees a clean diff. See `docs/agent-pr-workflow.md` (Parallel Reviewers).

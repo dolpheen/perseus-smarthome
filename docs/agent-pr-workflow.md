@@ -37,6 +37,19 @@ The Claude reviewer is expected to verify each criterion against the diff and ti
 
 For criteria that require hardware verification (e.g. "verify GPIO23 actually toggles 3.3V"), label the issue `needs-manual-verification`. The implementer or owner runs the test on the Raspberry Pi, posts results in the PR, ticks the box manually, and merges by hand once verified.
 
+## Parallel Reviewers
+
+`claude-review` is the contractual gate. It is the only reviewer whose findings drive auto-merge (via `do-not-merge` on Blocking) and the only review the auto-merge workflow waits on.
+
+In addition, GitHub's built-in `copilot-pull-request-reviewer[bot]` posts inline review comments on every PR. Treat it as an advisory parallel voice, not a gate. It often catches things outside the Claude rubric (cross-file inconsistencies, deployment-config drift, latent shell bugs).
+
+Triage rule:
+
+- Substantive findings (correctness, safety, spec alignment, deployment config drift) — fold into the round-1 `@copilot` punch list alongside the Claude findings, even if Claude did not flag them. Post a supplement comment if Claude already fired without surfacing the same item.
+- Style or preference noise — ignore. Do not relay it to the implementer.
+
+Implementers (including the Copilot SWE Agent) should address Copilot reviewer comments together with the Claude punch list in the same fix push, so round 2 sees a clean diff.
+
 ## What a Fresh-Context Coding Agent Should Do
 
 1. Read `AGENTS.md` for project context, SDD rules, and the current milestone.
@@ -47,7 +60,8 @@ For criteria that require hardware verification (e.g. "verify GPIO23 actually to
 6. Run `uv run pytest -m "not e2e and not hardware"` locally before pushing.
 7. Open the PR with `Closes #N` in the body.
 8. Do not tick acceptance checkboxes for yourself; the Claude reviewer will.
-9. If the linked issue has `needs-manual-verification` or `critical`, expect the human to merge — do not retry, comment, or escalate.
+9. When fix commits are requested, address both the Claude punch list and any substantive `copilot-pull-request-reviewer[bot]` inline comments in the same push.
+10. If the linked issue has `needs-manual-verification` or `critical`, expect the human to merge — do not retry, comment, or escalate.
 
 ## Required Status Check Names
 
