@@ -4,7 +4,8 @@ Read `AGENTS.md` before making changes. This repository uses Specification-Drive
 
 Current implementation scope:
 
-- Milestone 1 is approved: Raspberry Pi I/O MCP server only.
+- Milestone 1 is drafted but not approved yet. Do not start implementation until GitHub issue `#1` is closed.
+- The planned Milestone 1 scope is Raspberry Pi I/O MCP server only.
 - No LLM agent implementation in Milestone 1.
 - Target board is Raspberry Pi 2 on Raspberry Pi OS Lite 32-bit based on Debian Trixie.
 - Runtime is Python 3.13, package manager is `uv`, and `uv.lock` must be committed.

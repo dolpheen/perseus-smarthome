@@ -1,6 +1,6 @@
 # Raspberry Pi I/O MCP Server Tasks
 
-Status: Approved
+Status: Draft
 Last reviewed: 2026-04-30  
 Owner: Vadim  
 Requirements: requirements.md  
@@ -19,9 +19,10 @@ This milestone is complete when:
 
 ## Current Status
 
-- Milestone 1 requirements, design, and task plan are approved for implementation.
+- Milestone 1 requirements, design, and task plan are drafted and awaiting owner review.
 - GitHub issue dependencies are configured through native issue Relationships.
-- Start implementation with GitHub issue `#2`, "Scaffold Python project with uv and dependencies".
+- Implementation is blocked on GitHub issue `#1`, "Approve Milestone 1 Raspberry Pi I/O MCP specs".
+- After `#1` is closed, start implementation with GitHub issue `#2`, "Scaffold Python project with uv and dependencies".
 - `tools/find_raspberry.py` and `tests/test_find_raspberry.py` already exist and were verified before Milestone 1 implementation start.
 
 ## GitHub Implementation Issues
@@ -150,5 +151,4 @@ None for Milestone 1 implementation.
 
 ## Change Log
 
-- 2026-04-30: Owner approved the Milestone 1 task plan for implementation.
-- 2026-04-30: Added GitHub issue mapping and current implementation start point.
+- 2026-04-30: Added GitHub issue mapping and clarified that implementation remains blocked until owner approval.
