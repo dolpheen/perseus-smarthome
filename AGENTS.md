@@ -44,15 +44,15 @@ future WiFi/BLE/Z-Wave connectivity, and the LLM agent layer) is not yet
 implemented.
 
 GitHub issues `#1` through `#9` are closed. All four Milestone 1 acceptance
-gates passed on the live Pi (172.16.0.101, user `perseus`):
+gates passed on the live Pi (host coordinates in local `.env`):
 
 - Automated MacBook E2E loopback: 12/12 PASS via `--run-hardware`.
 - Manual multimeter smoke (`tools/smoke_meter.py`): 5/5 PASS.
 - Pi reboot persistence: `sudo reboot`; systemd autostarted the service with
   GPIO23 reset to safe-default 0; E2E rerun green.
-- Codex MCP smoke: `codex mcp add rpi-io --url http://<pi>:8000/mcp`; fresh
-  Codex session called `rpi-io.list_devices` and received both configured
-  devices.
+- Codex MCP smoke: `codex mcp add rpi-io --url http://<raspberry-pi-ip>:8000/mcp`;
+  fresh Codex session called `rpi-io.list_devices` and received both
+  configured devices.
 
 Repository infrastructure in place:
 

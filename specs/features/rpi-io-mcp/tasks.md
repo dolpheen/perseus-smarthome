@@ -21,11 +21,11 @@ This milestone is complete when:
 
 - Milestone 1 requirements, design, and task plan are Implemented (issue `#1` closed 2026-04-30; closeout #9 closed 2026-05-01).
 - Tasks 1–9 implemented and merged to `main` across PRs #18, #21, #22, #28, #29, #31, #32, #35, #36, #38; closeout (task 10) merged via the issue #9 PR on 2026-05-01.
-- All four hardware/client acceptance gates passed on the live Pi (172.16.0.101, user `perseus`):
+- All four hardware/client acceptance gates passed on the live Pi (host coordinates in local `.env`):
   - Automated MacBook E2E loopback (jumper-wired): 12/12 PASS via `--run-hardware`.
   - Manual multimeter smoke (`tools/smoke_meter.py`): 5/5 PASS.
   - Pi reboot persistence: `sudo reboot`; systemd autostarted the service with GPIO23 at safe-default 0; E2E rerun green.
-  - Codex MCP smoke: `codex mcp add rpi-io --url http://172.16.0.101:8000/mcp`; fresh Codex session invoked `rpi-io.list_devices` and received both devices with capabilities and states. The Codex TUI `/mcp` panel does not render user-registered streamable HTTP servers in this CLI version (0.125.0); discoverability and invocation work — verified via tool call.
+  - Codex MCP smoke: `codex mcp add rpi-io --url http://<raspberry-pi-ip>:8000/mcp` (URL from local `.env`'s `RPI_MCP_URL`); fresh Codex session invoked `rpi-io.list_devices` and received both devices with capabilities and states. The Codex TUI `/mcp` panel does not render user-registered streamable HTTP servers in this CLI version (0.125.0); discoverability and invocation work — verified via tool call.
 - systemd service: installed, `systemctl is-active` → `active`, MCP endpoint reachable across reboot.
 
 ## GitHub Implementation Issues
@@ -113,7 +113,7 @@ RPI_MCP_URL=http://<raspberry-pi-ip>:8000/mcp uv run pytest tests/e2e/test_rpi_i
 - Ensure service restarts on failure.
 - Document logs via `journalctl`.
 
-8. Raspberry Pi discovery tool (Done — `tools/find_raspberry.py` shipped before Milestone 1 implementation began; verified on the LAN at 172.16.0.101)
+8. Raspberry Pi discovery tool (Done — `tools/find_raspberry.py` shipped before Milestone 1 implementation began; verified on the LAN against the Pi recorded in local `.env`)
 
 - Implement `tools/find_raspberry.py`.
 - Support hostname lookup, explicit subnet scanning, SSH probing, ARP/MAC enrichment, JSON output, and safe `.env` updates.
@@ -161,7 +161,7 @@ Acceptance gates signed off on 2026-05-01:
 - Automated MacBook E2E `--run-hardware`: 12/12 PASS.
 - Manual GPIO smoke (multimeter via `tools/smoke_meter.py`): 5/5 PASS.
 - Pi reboot persistence: `sudo reboot`; systemd autostart confirmed; GPIO23 reset to 0; E2E rerun green.
-- Codex MCP smoke: `codex mcp add rpi-io --url http://172.16.0.101:8000/mcp`; fresh Codex session called `rpi-io.list_devices` and received both configured devices with capabilities and states.
+- Codex MCP smoke: `codex mcp add rpi-io --url http://<raspberry-pi-ip>:8000/mcp` (URL from local `.env`'s `RPI_MCP_URL`); fresh Codex session called `rpi-io.list_devices` and received both configured devices with capabilities and states.
 
 Issue #9 closed on merge.
 
