@@ -19,8 +19,8 @@ This milestone is complete when:
 
 ## Current Status
 
-- Milestone 1 requirements, design, and task plan are Implemented (issue `#1` closed 2026-04-30; closeout #9 closed 2026-05-01).
-- Tasks 1–9 implemented and merged to `main` across PRs #18, #21, #22, #28, #29, #31, #32, #35, #36, #38; closeout (task 10) merged via the issue #9 PR on 2026-05-01.
+- Milestone 1 requirements, design, and task plan are Implemented (issue `#1` closed 2026-04-30; closeout issue `#9` closed 2026-05-01).
+- Tasks 1–9 implemented and merged to `main` across PRs #18, #21, #22, #28, #29, #31, #32, #35, #36, #38; closeout (task 10) merged via the PR closing issue `#9` on 2026-05-01.
 - All four hardware/client acceptance gates passed on the live Pi (host coordinates in local `.env`):
   - Automated MacBook E2E loopback (jumper-wired): 12/12 PASS via `--run-hardware`.
   - Manual multimeter smoke (`tools/smoke_meter.py`): 5/5 PASS.
@@ -145,9 +145,9 @@ codex mcp get rpi-io
 
 - Record that a new Codex session is required before tools are available.
 
-10. Documentation closeout (Done — issue #9, 2026-05-01)
+10. Documentation closeout (Done — issue `#9`, 2026-05-01)
 
-Closeout work landed in the issue #9 PR:
+Closeout work landed in the PR closing issue `#9`:
 
 - `specs/project.spec.md` — Related code/tests fields populated; Change Log entry records Milestone 1 final verification. Project spec stays `Approved` (project scope still includes future-milestone CC2531/Zigbee/WiFi/BLE/Z-Wave work and the LLM agent layer, none of which are implemented yet).
 - `specs/features/rpi-io-mcp/requirements.md` — Status flipped to `Implemented`; Related code/tests already populated; Change Log entry added.
@@ -163,7 +163,7 @@ Acceptance gates signed off on 2026-05-01:
 - Pi reboot persistence: `sudo reboot`; systemd autostart confirmed; GPIO23 reset to 0; E2E rerun green.
 - Codex MCP smoke: `codex mcp add rpi-io --url http://<raspberry-pi-ip>:8000/mcp` (URL from local `.env`'s `RPI_MCP_URL`); fresh Codex session called `rpi-io.list_devices` and received both configured devices with capabilities and states.
 
-Issue #9 closed on merge.
+Issue `#9` closed on merge.
 
 ## Remaining Decisions Before Code
 
@@ -174,4 +174,4 @@ None for Milestone 1 implementation.
 - 2026-04-30: Added GitHub issue mapping and clarified that implementation remains blocked until owner approval.
 - 2026-04-30: Owner approved Milestone 1 specs (issue `#1` closed). Status flipped to Approved; implementation begins with `#2`.
 - 2026-05-01: Tasks 1–9 implemented and merged. Per-task PR pointers and "Done" markers added. Task 10 in progress; spec status flip to Implemented deferred until Pi reboot persistence and Codex MCP smoke are signed off (issue #9).
-- 2026-05-01: Closeout (task 10) complete. All four acceptance gates green (automated E2E 12/12, multimeter smoke 5/5, Pi reboot persistence, Codex MCP smoke). Status flipped from Approved to Implemented. Issue #9 closed.
+- 2026-05-01: Closeout (task 10) complete. All four acceptance gates green (automated E2E 12/12, multimeter smoke 5/5, Pi reboot persistence, Codex MCP smoke). Status flipped from Approved to Implemented. Issue `#9` closed.
