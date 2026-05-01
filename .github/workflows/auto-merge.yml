@@ -122,6 +122,38 @@ jobs:
             fi
           done
 
+          # Gate on unresolved copilot-pull-request-reviewer[bot] inline
+          # review threads. Copilot's reviewer surfaces real defects that
+          # claude-review's rubric sometimes misses (e.g. PR #36's
+          # WorkingDirectory mismatch); leaving its comments unaddressed at
+          # merge time silently buries that signal. Block until every
+          # Copilot thread on the PR is marked Resolved by a maintainer.
+          if ! threads_json=$(gh api graphql -f query="
+            query { repository(owner:\"$owner\", name:\"$name\") {
+              pullRequest(number:$PR_NUMBER) {
+                reviewThreads(first:100) {
+                  nodes {
+                    isResolved
+                    comments(first:1) { nodes { author { login } } }
+                  }
+                }
+              }
+            }}"); then
+            echo "GraphQL call for review threads failed; failing closed"
+            echo "merge=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          unresolved=$(jq '
+            [.data.repository.pullRequest.reviewThreads.nodes[]
+             | select(.isResolved == false)
+             | select(.comments.nodes[0].author.login == "copilot-pull-request-reviewer")
+            ] | length' <<<"$threads_json")
+          if [[ "$unresolved" -gt 0 ]]; then
+            echo "PR has $unresolved unresolved copilot-pull-request-reviewer thread(s); not merging"
+            echo "merge=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
           echo "All conditions met"
           echo "merge=true" >> "$GITHUB_OUTPUT"
 

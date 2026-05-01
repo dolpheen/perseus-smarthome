@@ -10,7 +10,12 @@ How issues turn into merged code in this repo. Read this before opening a PR.
 4. **Checks** — two required checks run automatically:
    - `pytest` — runs `uv run pytest -m "not e2e and not hardware"` on Python 3.13.
    - `claude-review` — runs the Claude Code reviewer using `CLAUDE.md` as the rubric.
-5. **Merge** — the auto-merge workflow squash-merges the PR and deletes the branch when both checks pass and no opt-out label is set on the PR or any linked issue. It re-evaluates automatically when `CI` or `Claude Code Review` completes (via `workflow_run`), so a green PR merges without any manual nudge.
+5. **Merge** — the auto-merge workflow squash-merges the PR and deletes the branch when:
+   - both required checks pass,
+   - no opt-out label is set on the PR or any linked issue, and
+   - every `copilot-pull-request-reviewer[bot]` inline review thread on the PR is marked Resolved (see [Parallel Reviewers](#parallel-reviewers)).
+
+   It re-evaluates automatically when `CI` or `Claude Code Review` completes (via `workflow_run`), so a green PR merges without any manual nudge once all three conditions are met.
 
 ## Opt-out Labels
 
@@ -39,16 +44,21 @@ For criteria that require hardware verification (e.g. "verify GPIO23 actually to
 
 ## Parallel Reviewers
 
-`claude-review` is the contractual gate. It is the only reviewer whose findings drive auto-merge (via `do-not-merge` on Blocking) and the only review the auto-merge workflow waits on.
+Two reviewers run on every PR and **both gate auto-merge**:
 
-In addition, GitHub's built-in `copilot-pull-request-reviewer[bot]` posts inline review comments on every PR. Treat it as an advisory parallel voice, not a gate. It often catches things outside the Claude rubric (cross-file inconsistencies, deployment-config drift, latent shell bugs).
+- `claude-review` — the rubric reviewer driven by `CLAUDE.md`. Auto-applies `do-not-merge` on any Blocking finding; runs as a required check.
+- `copilot-pull-request-reviewer[bot]` — GitHub's built-in inline reviewer. Auto-merge counts every unresolved Copilot review thread as a block and refuses to merge until a maintainer resolves them on GitHub.
 
-Triage rule:
+Both signals matter because they catch different things. Copilot's reviewer has flagged real defects outside the Claude rubric (e.g. PR #36's `WorkingDirectory` hardcoding mismatch with the configurable `RPI_PROJECT_DIR` — claude-review missed it cleanly). Treating either as advisory silently buries that signal at merge time.
 
-- Substantive findings (correctness, safety, spec alignment, deployment config drift) — fold into the round-1 `@copilot` punch list alongside the Claude findings, even if Claude did not flag them. Post a supplement comment if Claude already fired without surfacing the same item.
-- Style or preference noise — ignore. Do not relay it to the implementer.
+Triage rule for the **PR author / maintainer**:
+
+- Substantive findings (correctness, safety, spec alignment, deployment-config drift) — fold into the round-1 `@copilot` punch list alongside the Claude findings, even if Claude did not flag them. Post a supplement comment if Claude already fired without surfacing the same item. Once a fix lands, mark the Copilot thread Resolved on GitHub so auto-merge unblocks.
+- Style or preference noise that you've decided not to act on — still mark the thread Resolved (with a one-line reply explaining why), since auto-merge cannot tell substantive from noise.
 
 Implementers (including the Copilot SWE Agent) should address Copilot reviewer comments together with the Claude punch list in the same fix push, so round 2 sees a clean diff.
+
+A maintainer override path exists: setting the `do-not-merge` label keeps merge off, and removing all Copilot threads via Resolve-with-comment is the supported way to land changes Copilot flagged but the maintainer chose not to change.
 
 ## What a Fresh-Context Coding Agent Should Do
 
