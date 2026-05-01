@@ -6,12 +6,13 @@ Raspberry Pi OS Lite 32-bit (Debian Trixie).
 Hardware target: Raspberry Pi 2.  
 Service user: `RPI_SSH_USER` from `.env` (default `pi`; must be in the `gpio`
 group). The repo's unit file uses `pi` as the canonical Raspbian default, and
-`scripts/deploy_rpi_io_mcp.sh` rewrites `User=` to match `RPI_SSH_USER` at
-install time so a Pi with a custom primary user (e.g. `perseus`) works without
-editing the unit by hand.  
+`scripts/remote-install.sh` passes `--user "$RPI_SSH_USER"` to
+`scripts/install.sh` on the Pi, which rewrites `User=` to match at install time
+so a Pi with a custom primary user (e.g. `perseus`) works without editing the
+unit by hand.  
 Project directory on Pi: `/opt/raspberry-smarthome` (fixed; not configurable via
-`RPI_PROJECT_DIR` so the systemd unit, deploy script, and docs all agree without
-runtime templating of paths).
+`RPI_PROJECT_DIR` so the systemd unit, install scripts, and docs all agree
+without runtime templating of paths).
 
 ## Prerequisites
 
@@ -53,15 +54,30 @@ runtime templating of paths).
 
 ## First Install
 
-### Option A — Automated deploy script
+### Option A — Automated remote-install script
 
 ```bash
 # From the repository root on your MacBook:
-./scripts/deploy_rpi_io_mcp.sh
+./scripts/remote-install.sh install
 ```
 
-The script reads `.env`, syncs the project to the Pi, runs `uv sync --no-dev`,
-copies the systemd unit, enables, and starts the service.
+The script reads `.env`, rsyncs the project to `/opt/raspberry-smarthome` on
+the Pi, then SSHs and runs `sudo scripts/install.sh install --user <user>`,
+which installs `uv` dependencies, renders and enables the systemd unit, and
+starts the service.
+
+Supported subcommands:
+
+```bash
+./scripts/remote-install.sh install          # first install
+./scripts/remote-install.sh upgrade          # re-sync and restart after code changes
+./scripts/remote-install.sh status           # print service status
+./scripts/remote-install.sh uninstall        # stop/disable service and remove systemd unit
+./scripts/remote-install.sh uninstall --purge  # also removes /opt/raspberry-smarthome
+```
+
+A `make remote-install` forwarder will land in a future PR for convenience.
+Until then, call the script directly as shown above.
 
 ### Option B — Manual steps
 
@@ -91,11 +107,11 @@ sudo systemctl start rpi-io-mcp.service
 
 ## Update (re-deploy after code changes)
 
-Run the deploy script again — it syncs changed files, updates dependencies, and
+Run the upgrade subcommand — it syncs changed files, updates dependencies, and
 restarts the service:
 
 ```bash
-./scripts/deploy_rpi_io_mcp.sh
+./scripts/remote-install.sh upgrade
 ```
 
 Or manually on the Pi:

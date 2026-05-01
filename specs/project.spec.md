@@ -3,7 +3,7 @@
 Status: Approved
 Last reviewed: 2026-05-01  
 Owner: Vadim  
-Related code: config/rpi-io.toml; pyproject.toml; src/perseus_smarthome/config.py; src/perseus_smarthome/devices.py; src/perseus_smarthome/gpio.py; src/perseus_smarthome/service.py; src/perseus_smarthome/server.py; deploy/systemd/rpi-io-mcp.service; scripts/deploy_rpi_io_mcp.sh; tools/find_raspberry.py; tools/smoke_meter.py  
+Related code: config/rpi-io.toml; pyproject.toml; src/perseus_smarthome/config.py; src/perseus_smarthome/devices.py; src/perseus_smarthome/gpio.py; src/perseus_smarthome/service.py; src/perseus_smarthome/server.py; deploy/systemd/rpi-io-mcp.service; scripts/remote-install.sh; tools/find_raspberry.py; tools/smoke_meter.py  
 Related tests: tests/test_config.py; tests/test_devices.py; tests/test_gpio.py; tests/test_service.py; tests/test_mcp_server.py; tests/test_find_raspberry.py; tests/e2e/test_rpi_io_mcp.py
 
 ## Summary

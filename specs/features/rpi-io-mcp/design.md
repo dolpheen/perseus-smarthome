@@ -286,7 +286,8 @@ decisions.
   installs use a `pi` user (UID 1000), but Bookworm-and-later installers
   prompt for an arbitrary username, and operators sometimes rename the
   primary user. The unit file in `deploy/systemd/rpi-io-mcp.service` keeps
-  `User=pi` as the canonical default; `scripts/deploy_rpi_io_mcp.sh`
+  `User=pi` as the canonical default; `scripts/install.sh` (invoked via
+  `scripts/remote-install.sh`)
   sed-substitutes `User=pi` and `/home/pi/` paths to match `RPI_SSH_USER`
   before installing into `/etc/systemd/system/`. Avoids an opaque
   status=203/EXEC failure when the deploy user isn't `pi`. Documented in
