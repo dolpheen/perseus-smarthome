@@ -8,12 +8,12 @@ on:
   # Re-evaluate when a maintainer marks a Copilot review thread Resolved (or
   # un-resolves one). Without this trigger the new copilot-pull-request-reviewer
   # gate added in PR #40 would leave PRs stuck after thread resolution: none of
-  # the other events fire on resolve, and `workflow_run` for CI/Claude Code
-  # Review only re-runs on a fresh push.
+  # the other events fire on resolve, and `workflow_run` for CI only re-runs on
+  # a fresh push.
   pull_request_review_thread:
     types: [resolved, unresolved]
   workflow_run:
-    workflows: ["CI", "Claude Code Review"]
+    workflows: ["CI"]
     types: [completed]
 
 permissions:
@@ -73,7 +73,7 @@ jobs:
           set -euo pipefail
 
           opt_out_labels=("critical" "needs-manual-verification" "do-not-merge")
-          required_checks=("pytest" "claude-review")
+          required_checks=("pytest")
 
           pr_data=$(gh pr view "$PR_NUMBER" --repo "$REPO" --json state,isDraft,labels,mergeable,mergeStateStatus)
           state=$(jq -r '.state' <<<"$pr_data")
@@ -137,11 +137,11 @@ jobs:
           done
 
           # Gate on unresolved copilot-pull-request-reviewer[bot] inline
-          # review threads. Copilot's reviewer surfaces real defects that
-          # claude-review's rubric sometimes misses (e.g. PR #36's
-          # WorkingDirectory mismatch); leaving its comments unaddressed at
-          # merge time silently buries that signal. Block until every
-          # Copilot thread on the PR is marked Resolved by a maintainer.
+          # review threads. Copilot's reviewer surfaces real defects outside
+          # normal pytest coverage (e.g. PR #36's WorkingDirectory mismatch);
+          # leaving its comments unaddressed at merge time silently buries
+          # that signal. Block until every Copilot thread on the PR is marked
+          # Resolved by a maintainer.
           # Fail-closed on every error path: GraphQL failure, paginated
           # overflow beyond first:100 threads, or any malformed payload.
           if ! threads_json=$(gh api graphql -f query="

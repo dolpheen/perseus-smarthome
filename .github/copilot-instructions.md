@@ -28,10 +28,10 @@ Work from the assigned GitHub issue only. Keep changes surgical, do not refactor
 
 For each PR:
 
-- **The PR body MUST contain `Closes #<N>`** (or `Fixes #<N>` / `Resolves #<N>`) referencing the GitHub issue you are implementing. This is how GitHub auto-closes the issue on merge and how the Claude reviewer locates the acceptance criteria. Without it the reviewer flags a Blocking finding and the issue stays open after merge.
+- **The PR body MUST contain `Closes #<N>`** (or `Fixes #<N>` / `Resolves #<N>`) referencing the GitHub issue you are implementing. This is how GitHub auto-closes the issue on merge and how auto-merge locates linked issue labels.
 - List the specs read.
 - List files changed.
 - Run the issue's `Verify` commands where possible.
 - If hardware verification cannot run, say so explicitly and keep unit tests hardware-free.
 - Preserve Raspberry Pi safety constraints: no arbitrary GPIO access, no 5V on GPIO inputs, GPIO23 resets low/off on service start, and GPIO24 is input-only.
-- When asked for fix commits, address both the Claude reviewer's punch list and any substantive `copilot-pull-request-reviewer[bot]` inline review comments in the same push, so round 2 sees a clean diff. See `docs/agent-pr-workflow.md` (Parallel Reviewers).
+- When asked for fix commits, address any substantive `copilot-pull-request-reviewer[bot]` inline review comments in the same push, so round 2 sees a clean diff. See `docs/agent-pr-workflow.md`.

@@ -88,9 +88,9 @@ sudo apt install ./dist/perseus-smarthome_<version>_armhf.deb # deb path
 Repository infrastructure in place:
 
 - SDD workflow and specs.
-- Claude Code reviewer workflow + Copilot inline reviewer; both gate auto-merge.
+- Copilot inline reviewer gate for PR review threads.
 - CI workflow running `uv run pytest -m "not e2e and not hardware"` on PRs and pushes to `main`.
-- Auto-merge workflow gated on `pytest` + `claude-review` + zero unresolved Copilot review threads, opt-out via `critical`, `needs-manual-verification`, or `do-not-merge` labels on the PR or any linked issue. See `docs/agent-pr-workflow.md`.
+- Auto-merge workflow gated on `pytest` + zero unresolved Copilot review threads, opt-out via `critical`, `needs-manual-verification`, or `do-not-merge` labels on the PR or any linked issue. See `docs/agent-pr-workflow.md`.
 - `.gitignore`, `.env.example`, `config/rpi-io.toml`, `tools/find_raspberry.py`, `tools/smoke_meter.py`.
 
 Implemented for Milestone 1:
