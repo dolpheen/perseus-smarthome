@@ -23,6 +23,14 @@ DIST_DIR="${REPO_ROOT}/dist"
 
 # ---------------------------------------------------------------------------
 # 2. Drift check: packaged unit must match canonical unit post-User-substitution
+#
+# The only permitted difference between the two files is the User= line:
+#   canonical:  User=pi
+#   packaged:   User=perseus-smarthome
+#
+# All other fields (ExecStart, WorkingDirectory, Group, Restart, etc.) must
+# be identical.  If the canonical unit gains new fields they must also be
+# applied to the packaged unit, and this check will catch the divergence.
 # ---------------------------------------------------------------------------
 CANONICAL_UNIT="${REPO_ROOT}/deploy/systemd/rpi-io-mcp.service"
 PACKAGED_UNIT="${SCRIPT_DIR}/debian/perseus-smarthome.service"

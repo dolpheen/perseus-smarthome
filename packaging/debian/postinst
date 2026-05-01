@@ -14,6 +14,7 @@ case "$1" in
     fi
     chown -R perseus-smarthome:gpio /opt/raspberry-smarthome
     systemctl daemon-reload
-    systemctl enable --now rpi-io-mcp.service
+    systemctl enable rpi-io-mcp.service
+    systemctl start rpi-io-mcp.service
     ;;
 esac
