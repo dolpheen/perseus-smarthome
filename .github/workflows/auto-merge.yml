@@ -5,6 +5,13 @@ on:
     types: [opened, reopened, synchronize, ready_for_review, labeled, unlabeled]
   pull_request_review:
     types: [submitted]
+  # Re-evaluate when a maintainer marks a Copilot review thread Resolved (or
+  # un-resolves one). Without this trigger the new copilot-pull-request-reviewer
+  # gate added in PR #40 would leave PRs stuck after thread resolution: none of
+  # the other events fire on resolve, and `workflow_run` for CI/Claude Code
+  # Review only re-runs on a fresh push.
+  pull_request_review_thread:
+    types: [resolved, unresolved]
   workflow_run:
     workflows: ["CI", "Claude Code Review"]
     types: [completed]
@@ -18,7 +25,14 @@ permissions:
   actions: read
 
 concurrency:
-  group: auto-merge-${{ github.event.pull_request.number || github.event.workflow_run.head_sha }}
+  # All trigger types resolve to a head ref: pull_request* and
+  # pull_request_review_thread carry pull_request.head.ref; workflow_run
+  # carries workflow_run.head_branch. Using either keeps every auto-merge
+  # job for the same PR in the same group regardless of which event fired
+  # it, avoiding the prior split where workflow_run used head_sha and
+  # pull_request* used the PR number — two runs for the same PR could race
+  # in parallel, last-writer-wins.
+  group: auto-merge-${{ github.event.pull_request.head.ref || github.event.workflow_run.head_branch }}
   cancel-in-progress: false
 
 jobs:
@@ -33,7 +47,7 @@ jobs:
         run: |
           set -euo pipefail
           case "${{ github.event_name }}" in
-            pull_request|pull_request_review)
+            pull_request|pull_request_review|pull_request_review_thread)
               echo "number=${{ github.event.pull_request.number }}" >> "$GITHUB_OUTPUT"
               ;;
             workflow_run)
@@ -121,6 +135,50 @@ jobs:
               exit 0
             fi
           done
+
+          # Gate on unresolved copilot-pull-request-reviewer[bot] inline
+          # review threads. Copilot's reviewer surfaces real defects that
+          # claude-review's rubric sometimes misses (e.g. PR #36's
+          # WorkingDirectory mismatch); leaving its comments unaddressed at
+          # merge time silently buries that signal. Block until every
+          # Copilot thread on the PR is marked Resolved by a maintainer.
+          # Fail-closed on every error path: GraphQL failure, paginated
+          # overflow beyond first:100 threads, or any malformed payload.
+          if ! threads_json=$(gh api graphql -f query="
+            query { repository(owner:\"$owner\", name:\"$name\") {
+              pullRequest(number:$PR_NUMBER) {
+                reviewThreads(first:100) {
+                  pageInfo { hasNextPage }
+                  nodes {
+                    isResolved
+                    comments(first:1) { nodes { author { login } } }
+                  }
+                }
+              }
+            }}"); then
+            echo "GraphQL call for review threads failed; failing closed"
+            echo "merge=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          has_next=$(jq -r '.data.repository.pullRequest.reviewThreads.pageInfo.hasNextPage // true' <<<"$threads_json")
+          if [[ "$has_next" == "true" ]]; then
+            echo "PR has more than 100 review threads; failing closed (raise the first:N cap or paginate)"
+            echo "merge=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          # Null-guard the author lookup so a thread with empty
+          # comments.nodes (API-created or edited-then-deleted edge case)
+          # does not blow up the jq filter under set -euo pipefail.
+          unresolved=$(jq '
+            [.data.repository.pullRequest.reviewThreads.nodes[]
+             | select(.isResolved == false)
+             | select((.comments.nodes[0].author.login // "") == "copilot-pull-request-reviewer")
+            ] | length' <<<"$threads_json")
+          if [[ "$unresolved" -gt 0 ]]; then
+            echo "PR has $unresolved unresolved copilot-pull-request-reviewer thread(s); not merging"
+            echo "merge=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
 
           echo "All conditions met"
           echo "merge=true" >> "$GITHUB_OUTPUT"
