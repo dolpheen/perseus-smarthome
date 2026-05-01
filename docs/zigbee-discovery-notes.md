@@ -27,9 +27,9 @@ decisions above are locked.
 ## Execution model
 
 All Phase 0 issues are worked by a coding agent running on the local MacBook,
-with SSH access to the Raspberry Pi over the same LAN (existing
-`.env::RPI_SSH_*` configuration; same connection `scripts/remote-install.sh`
-already proves). The agent can:
+with SSH access to the Raspberry Pi over the same LAN (using the `RPI_SSH_*`
+variables in the repo-root `.env` file; the same connection
+`scripts/remote-install.sh` already proves). The agent can:
 
 - Read/write files in this repo.
 - SSH to the Pi and run probes, flashers, pairing harnesses.
@@ -137,7 +137,7 @@ Pair Orvibo via the chosen stack. Capture:
 - Model identifier, manufacturer string.
 - Exposed clusters / attributes / command set.
 - ≥3 motion ON/OFF transitions with timestamps.
-- Re-join across coordinator power-cycle (`ssh pi@... sudo systemctl restart …`
+- Re-join across coordinator power-cycle (`ssh pi@<pi-host> sudo systemctl restart <service>`,
   or `sudo reboot`, depending on the chosen stack's lifecycle).
 
 Throwaway harness under `tools/`; explicitly not the production path. Will be
