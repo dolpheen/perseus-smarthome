@@ -33,7 +33,7 @@ deb:                 ## Build .deb (must run on armv7l Pi)
 	./packaging/build-deb.sh
 
 deb-install:         ## apt install the most recent built .deb
-	sudo apt install -y ./dist/perseus-smarthome_*_armhf.deb
+	sudo apt install -y $$(ls -t dist/perseus-smarthome_*_armhf.deb | head -1)
 
 deb-uninstall:       ## apt remove the package (keeps config)
 	sudo apt remove -y perseus-smarthome

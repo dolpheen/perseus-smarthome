@@ -73,10 +73,11 @@ make remote-uninstall        # stop/disable service and remove systemd unit
 make remote-uninstall PURGE=1  # also removes /opt/raspberry-smarthome
 ```
 
-Each target reads `.env`, rsyncs the project to `/opt/raspberry-smarthome` on
-the Pi, then SSHs and runs `sudo scripts/install.sh <subcommand>`, which
-installs `uv` dependencies, renders and enables the systemd unit, and starts
-the service.
+`make remote-install` and `make remote-upgrade` read `.env`, rsync the project
+to `/opt/raspberry-smarthome` on the Pi, then SSH and run
+`sudo scripts/install.sh <subcommand>`. `make remote-status` and
+`make remote-uninstall` SSH directly without rsyncing first (no file transfer
+needed).
 
 You can also invoke the script directly when `make` is not available:
 
