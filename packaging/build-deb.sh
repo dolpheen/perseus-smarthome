@@ -34,8 +34,12 @@ DIST_DIR="${REPO_ROOT}/dist"
 # ---------------------------------------------------------------------------
 CANONICAL_UNIT="${REPO_ROOT}/deploy/systemd/rpi-io-mcp.service"
 PACKAGED_UNIT="${SCRIPT_DIR}/debian/perseus-smarthome.service"
+# Canonical unit uses the script-install user; the packaged unit uses a
+# dedicated system user.  These are the only two values permitted to differ.
+CANONICAL_USER="pi"
+PACKAGED_USER="perseus-smarthome"
 
-canonical_rendered=$(sed 's/^User=pi$/User=perseus-smarthome/' "${CANONICAL_UNIT}")
+canonical_rendered=$(sed "s/^User=${CANONICAL_USER}$/User=${PACKAGED_USER}/" "${CANONICAL_UNIT}")
 packaged_content=$(cat "${PACKAGED_UNIT}")
 
 if [ "${canonical_rendered}" != "${packaged_content}" ]; then
