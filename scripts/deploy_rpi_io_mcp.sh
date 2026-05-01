@@ -78,12 +78,10 @@ ssh "${SSH_OPTS[@]}" "${SSH_TARGET}" "DEPLOY_USER='${RPI_SSH_USER}' bash -s" <<'
 set -euo pipefail
 # Render the unit with the actual deploy user. The repo's unit file uses
 # `pi` as the canonical Raspbian default, but a Pi whose primary user is
-# something other than `pi` (e.g. `perseus`) needs the User= and PATH
-# rewritten so systemd starts the service as the user that owns
-# /opt/raspberry-smarthome.
+# something other than `pi` (e.g. `perseus`) needs User= rewritten so
+# systemd starts the service as the user that owns /opt/raspberry-smarthome.
 sudo sed \
     -e "s|^User=pi$|User=${DEPLOY_USER}|" \
-    -e "s|/home/pi/|/home/${DEPLOY_USER}/|g" \
     /opt/raspberry-smarthome/deploy/systemd/rpi-io-mcp.service \
     | sudo tee /etc/systemd/system/rpi-io-mcp.service > /dev/null
 sudo systemctl daemon-reload

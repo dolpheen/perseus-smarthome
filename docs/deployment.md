@@ -6,9 +6,9 @@ Raspberry Pi OS Lite 32-bit (Debian Trixie).
 Hardware target: Raspberry Pi 2.  
 Service user: `RPI_SSH_USER` from `.env` (default `pi`; must be in the `gpio`
 group). The repo's unit file uses `pi` as the canonical Raspbian default, and
-`scripts/deploy_rpi_io_mcp.sh` rewrites `User=` and `/home/pi/` paths to match
-`RPI_SSH_USER` at install time so a Pi with a custom primary user (e.g.
-`perseus`) works without editing the unit by hand.  
+`scripts/deploy_rpi_io_mcp.sh` rewrites `User=` to match `RPI_SSH_USER` at
+install time so a Pi with a custom primary user (e.g. `perseus`) works without
+editing the unit by hand.  
 Project directory on Pi: `/opt/raspberry-smarthome` (fixed; not configurable via
 `RPI_PROJECT_DIR` so the systemd unit, deploy script, and docs all agree without
 runtime templating of paths).
@@ -78,11 +78,10 @@ ssh pi@raspberrypi.local
 cd /opt/raspberry-smarthome
 uv sync --no-dev
 
-# 4. On the Pi: install the systemd unit (rewriting User= and /home/pi/
-#    to match the actual user when the deploy user isn't `pi`)
+# 4. On the Pi: install the systemd unit (rewriting User= when the
+#    deploy user isn't `pi`)
 sudo sed \
     -e "s|^User=pi$|User=$USER|" \
-    -e "s|/home/pi/|/home/$USER/|g" \
     deploy/systemd/rpi-io-mcp.service \
     | sudo tee /etc/systemd/system/rpi-io-mcp.service > /dev/null
 sudo systemctl daemon-reload
