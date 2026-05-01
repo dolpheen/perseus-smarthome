@@ -77,6 +77,15 @@ else
   fi
   MAINTAINER="${GIT_NAME} <${GIT_EMAIL}>"
 fi
+# Basic RFC 5322 sanity check: the email portion must contain '@'.
+case "${MAINTAINER}" in
+  *@*) : ;;
+  *)
+    echo "ERROR: Maintainer email looks invalid: '${MAINTAINER}'" >&2
+    echo "       Set DEB_MAINTAINER='Your Name <you@example.com>' to override." >&2
+    exit 1
+    ;;
+esac
 echo "==> Maintainer: ${MAINTAINER}"
 
 # ---------------------------------------------------------------------------
@@ -108,6 +117,11 @@ cp "${PACKAGED_UNIT}" "${BUILD_DIR}/etc/systemd/system/rpi-io-mcp.service"
 # 6. Build the virtualenv into the staged tree
 # ---------------------------------------------------------------------------
 echo "==> Running uv sync --no-dev into staged tree..."
+if [ ! -f "${REPO_ROOT}/uv.lock" ]; then
+  echo "ERROR: uv.lock not found at ${REPO_ROOT}/uv.lock." >&2
+  echo "       Commit a current uv.lock before building the package." >&2
+  exit 1
+fi
 (
   cd "${BUILD_DIR}/opt/raspberry-smarthome"
   uv sync --no-dev

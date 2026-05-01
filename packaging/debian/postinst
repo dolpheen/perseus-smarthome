@@ -8,10 +8,9 @@ case "$1" in
               --shell /usr/sbin/nologin --no-create-home \
               perseus-smarthome
     fi
-    # Add to gpio for /dev/gpio* access.
-    if ! id -nG perseus-smarthome | grep -qw gpio; then
-      usermod -aG gpio perseus-smarthome
-    fi
+    # Add to gpio for /dev/gpio* access.  usermod -aG is idempotent when
+    # the user is already a member, so run it unconditionally.
+    usermod -aG gpio perseus-smarthome
     chown -R perseus-smarthome:gpio /opt/raspberry-smarthome
     systemctl daemon-reload
     systemctl enable rpi-io-mcp.service

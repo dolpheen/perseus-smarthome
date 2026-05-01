@@ -5,6 +5,10 @@ set -e
 # returns `install ok installed` only for a currently-installed package
 # (not for `rc` removed-but-not-purged, which would falsely look like a
 # script-managed install if we used `dpkg-query -L`'s exit code instead).
+#
+# Note: the install root is /opt/raspberry-smarthome (historical directory
+# name from Milestone 1) while the package name is perseus-smarthome.  Both
+# names refer to the same project; the directory name predates the .deb path.
 if [ -d /opt/raspberry-smarthome ]; then
   pkg_status=$(dpkg-query -W -f='${Status}' perseus-smarthome 2>/dev/null || true)
   case "$pkg_status" in
