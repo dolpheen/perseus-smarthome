@@ -1,0 +1,7 @@
+perseus-smarthome (0.1.0) unstable; urgency=low
+
+  * Initial Debian package release.
+  * Bundles a prebuilt Python virtualenv at /opt/raspberry-smarthome/.venv.
+  * Installs rpi-io-mcp.service managed by systemd as user perseus-smarthome.
+
+ -- Perseus Smarthome Maintainer <maintainer@example.com>  Fri, 01 May 2026 00:00:00 +0000

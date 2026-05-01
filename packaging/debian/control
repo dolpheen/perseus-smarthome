@@ -1,0 +1,12 @@
+Package: perseus-smarthome
+Version: __VERSION__
+Section: misc
+Priority: optional
+Architecture: armhf
+Maintainer: __MAINTAINER__
+Depends: liblgpio1, libffi8, adduser, systemd, libc6, python3 (>= 3.13)
+Description: Raspberry Pi I/O MCP Server
+ Hardware-facing MCP server that exposes configured GPIO outputs and
+ inputs over streamable HTTP on the trusted LAN. Bundles a prebuilt
+ Python virtualenv at /opt/raspberry-smarthome/.venv so installs are
+ self-contained.
