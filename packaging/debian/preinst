@@ -1,0 +1,18 @@
+#!/bin/sh
+set -e
+# Refuse to install on top of a script-managed install.
+# `dpkg-query -W -f='${Status}'` parses dpkg's own state record, so it
+# returns `install ok installed` only for a currently-installed package
+# (not for `rc` removed-but-not-purged, which would falsely look like a
+# script-managed install if we used `dpkg-query -L`'s exit code instead).
+if [ -d /opt/raspberry-smarthome ]; then
+  pkg_status=$(dpkg-query -W -f='${Status}' perseus-smarthome 2>/dev/null || true)
+  case "$pkg_status" in
+    "install ok installed") : ;;
+    *)
+      echo "Found a non-package install at /opt/raspberry-smarthome." >&2
+      echo "Run 'sudo make uninstall PURGE=1' first, then retry." >&2
+      exit 1
+      ;;
+  esac
+fi

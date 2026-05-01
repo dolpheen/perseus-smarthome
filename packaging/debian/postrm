@@ -1,0 +1,14 @@
+#!/bin/sh
+set -e
+case "$1" in
+  remove)
+    systemctl daemon-reload || true
+    ;;
+  purge)
+    systemctl daemon-reload || true
+    rm -rf /opt/raspberry-smarthome
+    if getent passwd perseus-smarthome >/dev/null; then
+      deluser --system perseus-smarthome >/dev/null 2>&1 || true
+    fi
+    ;;
+esac

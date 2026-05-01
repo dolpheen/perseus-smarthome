@@ -1,0 +1,24 @@
+[Unit]
+Description=Raspberry Pi I/O MCP Server
+After=network.target
+
+[Service]
+Type=simple
+User=perseus-smarthome
+Group=gpio
+WorkingDirectory=/opt/raspberry-smarthome
+ExecStart=/opt/raspberry-smarthome/.venv/bin/rpi-io-mcp
+Restart=on-failure
+RestartSec=5
+# Cap the SIGTERM-to-SIGKILL window so a hung asyncio shutdown cannot
+# silently bypass GPIO teardown for the systemd default 90s.
+TimeoutStopSec=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=rpi-io-mcp
+
+# Allow the service to inherit GPIO device access from the gpio group.
+# No special capabilities are required when the user is in the gpio group.
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,19 @@
+#!/bin/sh
+set -e
+case "$1" in
+  configure)
+    # Create system user if missing.
+    if ! getent passwd perseus-smarthome >/dev/null; then
+      adduser --system --group --home /opt/raspberry-smarthome \
+              --shell /usr/sbin/nologin --no-create-home \
+              perseus-smarthome
+    fi
+    # Add to gpio for /dev/gpio* access.
+    if ! id -nG perseus-smarthome | grep -qw gpio; then
+      usermod -aG gpio perseus-smarthome
+    fi
+    chown -R perseus-smarthome:gpio /opt/raspberry-smarthome
+    systemctl daemon-reload
+    systemctl enable --now rpi-io-mcp.service
+    ;;
+esac
