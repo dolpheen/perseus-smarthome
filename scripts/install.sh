@@ -79,13 +79,14 @@ wait_active() {
 # ── Subcommand: install ────────────────────────────────────────────────────────
 
 cmd_install() {
+  # DEP-FR-011: root required — must be the first check so operators see a
+  # clear permission error before any state is mutated.
+  require_root
+
   # Parse args
   resolve_user "$@"
 
   log "Starting install (deploy user: ${DEPLOY_USER})"
-
-  # DEP-FR-011: root required
-  require_root
 
   # Cross-path coexistence guard (design.md::Resolved Design Decisions::4):
   # Refuse if the deb-managed package is installed.
@@ -119,10 +120,11 @@ cmd_install() {
 
   # Step 3: uv (DEP-FR-004)
   log "Checking uv for user ${DEPLOY_USER}"
-  local user_home
-  user_home="$(eval echo "~${DEPLOY_USER}")"
   if ! sudo -u "${DEPLOY_USER}" bash -lc 'command -v uv' >/dev/null 2>&1; then
     log "Installing uv for ${DEPLOY_USER}"
+    # The upstream installer is fetched over HTTPS and piped to sh.
+    # No checksum is verified — this matches DEP-FR-004 and the trusted-LAN
+    # posture; see specs/features/deployment/requirements.md::DEP-FR-004.
     sudo -u "${DEPLOY_USER}" bash -lc \
       'curl -LsSf https://astral.sh/uv/install.sh | sh' \
       || die "uv installation failed. Check network access or proxy settings and retry."
@@ -252,6 +254,9 @@ cmd_upgrade() {
 
   # Step 7: Re-render and reinstall systemd unit
   log "Rendering and installing systemd unit"
+  if [[ ! -f "${UNIT_SRC}" ]]; then
+    die "Unit source file not found: ${UNIT_SRC}. The staged source may be incomplete — re-run install."
+  fi
   sed "s|^User=.*|User=${DEPLOY_USER}|" "${UNIT_SRC}" \
     > "${UNIT_DST}" \
     || die "Failed to write ${UNIT_DST}."
