@@ -54,30 +54,40 @@ without runtime templating of paths).
 
 ## First Install
 
-### Option A — Automated remote-install script
+### Option A — Automated remote-install (recommended)
+
+Run `make help` to see all available targets:
 
 ```bash
-# From the repository root on your MacBook:
+make help
+```
+
+The primary operator workflow uses `make` targets that delegate to
+`scripts/remote-install.sh`:
+
+```bash
+make remote-install          # first install
+make remote-upgrade          # re-sync and restart after code changes
+make remote-status           # print remote service status
+make remote-uninstall        # stop/disable service and remove systemd unit
+make remote-uninstall PURGE=1  # also removes /opt/raspberry-smarthome
+```
+
+`make remote-install` and `make remote-upgrade` read `.env`, rsync the project
+to `/opt/raspberry-smarthome` on the Pi, then SSH and run
+`sudo scripts/install.sh <subcommand>`. `make remote-status` and
+`make remote-uninstall` SSH directly without rsyncing first (no file transfer
+needed).
+
+You can also invoke the script directly when `make` is not available:
+
+```bash
 ./scripts/remote-install.sh install
+./scripts/remote-install.sh upgrade
+./scripts/remote-install.sh status
+./scripts/remote-install.sh uninstall
+./scripts/remote-install.sh uninstall --purge
 ```
-
-The script reads `.env`, rsyncs the project to `/opt/raspberry-smarthome` on
-the Pi, then SSHs and runs `sudo scripts/install.sh install --user <user>`,
-which installs `uv` dependencies, renders and enables the systemd unit, and
-starts the service.
-
-Supported subcommands:
-
-```bash
-./scripts/remote-install.sh install          # first install
-./scripts/remote-install.sh upgrade          # re-sync and restart after code changes
-./scripts/remote-install.sh status           # print service status
-./scripts/remote-install.sh uninstall        # stop/disable service and remove systemd unit
-./scripts/remote-install.sh uninstall --purge  # also removes /opt/raspberry-smarthome
-```
-
-A `make remote-install` forwarder will land in a future PR for convenience.
-Until then, call the script directly as shown above.
 
 ### Option B — Manual steps
 
@@ -107,8 +117,14 @@ sudo systemctl start rpi-io-mcp.service
 
 ## Update (re-deploy after code changes)
 
-Run the upgrade subcommand — it syncs changed files, updates dependencies, and
+Run the upgrade target — it syncs changed files, updates dependencies, and
 restarts the service:
+
+```bash
+make remote-upgrade
+```
+
+Or invoke the script directly:
 
 ```bash
 ./scripts/remote-install.sh upgrade
