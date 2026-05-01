@@ -288,6 +288,30 @@ def test_default_config_path_falls_back_to_canonical_install_root(
         )
 
 
+def test_load_config_resolves_default_path_at_call_time(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """load_config() with no argument must call _default_config_path() each
+    invocation (not freeze a value at module import). This is what allows
+    the systemd unit's WorkingDirectory= to be in effect when the
+    CWD-relative branch fires."""
+    wheel_module_file = (
+        tmp_path / "venv" / "lib" / "python3.13" / "site-packages" /
+        "perseus_smarthome" / "config.py"
+    )
+    wheel_module_file.parent.mkdir(parents=True)
+    wheel_module_file.touch()
+    cwd_root = tmp_path / "service-cwd"
+    cwd_config = cwd_root / "config" / "rpi-io.toml"
+    cwd_config.parent.mkdir(parents=True)
+    _write_minimal_config(cwd_config)
+    monkeypatch.chdir(cwd_root)
+    with patch.object(config_module, "__file__", str(wheel_module_file)):
+        data = config_module.load_config()
+    ids = [d["id"] for d in data["devices"]]
+    assert ids == ["gpio23_output"]
+
+
 def test_load_config_rejects_device_unsupported_kind(tmp_path: Path) -> None:
     cfg = tmp_path / "rpi-io.toml"
     cfg.write_text(

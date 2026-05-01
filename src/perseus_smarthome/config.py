@@ -20,8 +20,6 @@ def _default_config_path() -> Path:
     return Path("/opt/raspberry-smarthome/config/rpi-io.toml")
 
 
-DEFAULT_CONFIG_PATH = _default_config_path()
-
 _SUPPORTED_NUMBERING = {"BCM"}
 _SUPPORTED_DEVICE_KINDS = {"output", "input"}
 _REQUIRED_DEVICE_FIELDS = ("id", "name", "kind", "pin")
@@ -31,12 +29,20 @@ class ConfigError(Exception):
     """Raised when the configuration file is invalid."""
 
 
-def load_config(path: Path = DEFAULT_CONFIG_PATH) -> dict[str, Any]:
+def load_config(path: Path | None = None) -> dict[str, Any]:
     """Load and validate the TOML config file.
+
+    When called with no argument, the default path is resolved at call time
+    via `_default_config_path()` so the systemd unit's `WorkingDirectory=`
+    is in effect when the CWD-relative branch fires (resolving at import
+    time captured a stale CWD if any importer ran before the unit's
+    working directory took effect).
 
     Returns the parsed config dict on success.
     Raises ConfigError for invalid configuration.
     """
+    if path is None:
+        path = _default_config_path()
     with open(path, "rb") as f:
         data = tomllib.load(f)
     _validate(data)

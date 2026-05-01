@@ -48,12 +48,16 @@ DIST_DIR="${REPO_ROOT}/dist"
 # ---------------------------------------------------------------------------
 CANONICAL_UNIT="${REPO_ROOT}/deploy/systemd/rpi-io-mcp.service"
 PACKAGED_UNIT="${SCRIPT_DIR}/debian/perseus-smarthome.service"
-# Canonical unit uses the script-install user; the packaged unit uses a
-# dedicated system user.  These are the only two values permitted to differ.
-CANONICAL_USER="pi"
+# The packaged unit uses a dedicated system user; the canonical unit uses
+# the script-install user. The User= line is the only value permitted to
+# differ. Use the same broad `^User=.*` anchor that scripts/install.sh
+# uses for its at-install rewrite — anchoring the canonical user to a
+# specific literal (e.g. "pi") would cause this drift check to silently
+# pass in the corner case where someone manually edited both unit files
+# to agree on a non-canonical user value.
 PACKAGED_USER="perseus-smarthome"
 
-canonical_rendered=$(sed "s/^User=${CANONICAL_USER}$/User=${PACKAGED_USER}/" "${CANONICAL_UNIT}")
+canonical_rendered=$(sed "s|^User=.*|User=${PACKAGED_USER}|" "${CANONICAL_UNIT}")
 packaged_content=$(cat "${PACKAGED_UNIT}")
 
 if [ "${canonical_rendered}" != "${packaged_content}" ]; then
