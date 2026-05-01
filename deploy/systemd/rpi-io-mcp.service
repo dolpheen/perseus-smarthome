@@ -7,17 +7,7 @@ Type=simple
 User=pi
 Group=gpio
 WorkingDirectory=/opt/raspberry-smarthome
-# Absolute path to uv: systemd's ExecStart binary lookup uses its own internal
-# PATH (typically /usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin)
-# and does NOT consult Environment="PATH=...", so a relative `uv run ...` here
-# fails with status=203/EXEC when uv is installed under ~/.local/bin (the
-# default for `pipx install uv`). The deploy script substitutes /home/pi/ with
-# the actual deploy user's home before installing this unit.
-Environment="PATH=/home/pi/.local/bin:/usr/local/bin:/usr/bin:/bin"
-# --no-dev matches the deploy script's `uv sync --no-dev`. Without it, the
-# first service start re-syncs the venv to add dev dependencies (pytest et al.)
-# that the deploy intentionally skipped, which adds ~20s to startup on Pi 2.
-ExecStart=/home/pi/.local/bin/uv run --no-dev rpi-io-mcp
+ExecStart=/opt/raspberry-smarthome/.venv/bin/rpi-io-mcp
 Restart=on-failure
 RestartSec=5
 # Cap the SIGTERM-to-SIGKILL window so a hung asyncio shutdown cannot

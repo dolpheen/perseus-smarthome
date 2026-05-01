@@ -20,6 +20,9 @@ Required reading for implementation PRs:
 - `specs/features/rpi-io-mcp/requirements.md`
 - `specs/features/rpi-io-mcp/design.md`
 - `specs/features/rpi-io-mcp/tasks.md`
+- `specs/features/deployment/requirements.md`
+- `specs/features/deployment/design.md`
+- `specs/features/deployment/tasks.md`
 
 Work from the assigned GitHub issue only. Keep changes surgical, do not refactor unrelated code, and do not implement future CC2531, Zigbee, WiFi, BLE, Z-Wave, UI, or LLM-agent behavior.
 
