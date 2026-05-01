@@ -60,16 +60,16 @@ on agent output alone.
 
 | Step | Title | Blocked by | Bench action |
 |---|---|---|---|
-| 0 | CC2531 + Orvibo bench prep | — | read sensor label |
-| 1 | Flash CC2531 with Z-Stack 3.x.0 firmware | Step 0 | wire jumpers / plug CC Debugger |
-| 2 | Stack selection — Z2M vs zigpy-znp vs ZHA | — | review & accept recommendation |
-| 3 | Orvibo pairing & motion proof-of-life | Steps 1, 2 | press pairing button; trigger motion |
-| 4 | Capture Phase 0 outputs | Steps 0–3 | review writeup |
-| Final | Lock decisions for Phase 1 spec | Step 4 | owner sign-off |
+| 0 | CC2531 + Orvibo bench prep (#59) | — | read sensor label |
+| 1 | Flash CC2531 with Z-Stack 3.x.0 firmware (#60) | #59 | wire jumpers / plug CC Debugger |
+| 2 | Stack selection — Z2M vs zigpy-znp vs ZHA (#61) | — | review & accept recommendation |
+| 3 | Orvibo pairing & motion proof-of-life (#62) | #60, #61 | press pairing button; trigger motion |
+| 4 | Capture Phase 0 outputs (#63) | #59, #60, #61, #62 | review writeup |
+| Final | Lock decisions for Phase 1 spec (#64) | #63 | owner sign-off |
 
-Issue numbers are filled in once issues are opened and linked via GitHub's
-text-only "Blocked by:" notes (matching the existing repo convention; native
-issue Relationships are not configured for this repo).
+Cross-issue dependencies are tracked via text-only "Blocked by:" notes,
+matching the existing repo convention (native issue Relationships are not
+configured here).
 
 ## Step 0 — Bench prep
 
