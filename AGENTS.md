@@ -68,7 +68,7 @@ Implemented for Milestone 1:
 - `src/perseus_smarthome/` — `config.py`, `devices.py`, `gpio.py` (mock + GPIO Zero adapter), `service.py`, `server.py` (FastMCP streamable HTTP).
 - 118 unit tests across config, devices, gpio, service, mcp_server, find_raspberry.
 - MacBook E2E suite at `tests/e2e/test_rpi_io_mcp.py` with `--run-hardware` opt-in for loopback tests.
-- systemd service at `deploy/systemd/rpi-io-mcp.service`, deploy script at `scripts/deploy_rpi_io_mcp.sh`, deployment guide at `docs/deployment.md`, manual smoke guide at `docs/manual-smoke-tests.md`.
+- systemd service at `deploy/systemd/rpi-io-mcp.service`, remote wrapper at `scripts/remote-install.sh`, deployment guide at `docs/deployment.md`, manual smoke guide at `docs/manual-smoke-tests.md`.
 
 ## What To Do Next
 
