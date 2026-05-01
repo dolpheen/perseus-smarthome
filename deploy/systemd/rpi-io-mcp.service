@@ -7,6 +7,12 @@ Type=simple
 User=pi
 Group=gpio
 WorkingDirectory=/opt/raspberry-smarthome
+# lgpio creates notification FIFOs in $LG_WD (default $HOME). The .deb path
+# runs as a system user with /usr/sbin/nologin and a HOME the service has no
+# need to touch outside lgpio bookkeeping; route lgpio at a transient dir so
+# the backend initializes without permission errors regardless of $HOME.
+RuntimeDirectory=rpi-io-mcp
+Environment=LG_WD=/run/rpi-io-mcp
 ExecStart=/opt/raspberry-smarthome/.venv/bin/rpi-io-mcp
 Restart=on-failure
 RestartSec=5

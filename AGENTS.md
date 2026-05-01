@@ -38,13 +38,22 @@ Before implementation, read:
 
 Milestone 1 (Raspberry Pi I/O MCP server) is **Implemented** on `main` as of
 2026-05-01. The feature spec under `specs/features/rpi-io-mcp/` is at
-`Status: Implemented`. The project-level spec at `specs/project.spec.md`
-remains `Status: Approved` because broader project scope (CC2531/Zigbee,
-future WiFi/BLE/Z-Wave connectivity, and the LLM agent layer) is not yet
+`Status: Implemented`. The deployment-optimization feature spec under
+`specs/features/deployment/` is also at `Status: Implemented` as of
+2026-05-01 — both install paths (idempotent script via
+`make remote-install`, and a Debian package via `make deb` /
+`apt install ./dist/<deb>`) are operational and verified on the live Pi.
+The project-level spec at `specs/project.spec.md` remains
+`Status: Approved` because broader project scope (CC2531/Zigbee, future
+WiFi/BLE/Z-Wave connectivity, and the LLM agent layer) is not yet
 implemented.
 
-GitHub issues `#1` through `#9` are closed. All four Milestone 1 acceptance
-gates passed on the live Pi (host coordinates in local `.env`):
+GitHub issues `#1` through `#9` and `#43` through `#48` are closed. All
+four Milestone 1 acceptance gates and all twelve deployment-optimization
+acceptance gates (six per install path) passed on the live Pi (host
+coordinates in local `.env`):
+
+Milestone 1 (rpi-io-mcp):
 
 - Automated MacBook E2E loopback: 12/12 PASS via `--run-hardware`.
 - Manual multimeter smoke (`tools/smoke_meter.py`): 5/5 PASS.
@@ -53,6 +62,28 @@ gates passed on the live Pi (host coordinates in local `.env`):
 - Codex MCP smoke: `codex mcp add rpi-io --url http://<raspberry-pi-ip>:8000/mcp`;
   fresh Codex session called `rpi-io.list_devices` and received both
   configured devices.
+
+Deployment optimization (script + deb paths):
+
+- Script-install path A1–A6: `make remote-install` from a clean Pi,
+  `systemctl is-active` → `active`, E2E `--run-hardware` 12/12, reboot
+  with autostart + GPIO23 safe-default 0 + E2E rerun, idempotent
+  `make remote-install` re-run, `make remote-uninstall PURGE=1`.
+- Deb path B1–B6: `make deb` produces
+  `dist/perseus-smarthome_<version>_armhf.deb` with the expected
+  `Depends:` and bundled `.venv/bin/rpi-io-mcp`,
+  `apt install ./dist/<deb>` brings the service active under
+  `User=perseus-smarthome`, E2E 12/12 pre- and post-reboot,
+  `apt remove` stops the service while preserving `/opt/raspberry-smarthome`,
+  `apt purge` removes the install root and the `perseus-smarthome` system
+  user.
+
+Fresh-Pi install commands:
+
+```bash
+make remote-install                                           # script path
+sudo apt install ./dist/perseus-smarthome_<version>_armhf.deb # deb path
+```
 
 Repository infrastructure in place:
 
