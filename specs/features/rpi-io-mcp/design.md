@@ -1,7 +1,7 @@
 # Raspberry Pi I/O MCP Server Design
 
-Status: Approved
-Last reviewed: 2026-04-30  
+Status: Implemented
+Last reviewed: 2026-05-01  
 Owner: Vadim  
 Requirements: requirements.md
 
@@ -334,3 +334,4 @@ decisions.
 - 2026-04-30: Clarified the proposed listen-address default as `0.0.0.0` on trusted LAN, pending owner review.
 - 2026-04-30: Owner approved the listen-address decision with the rest of Milestone 1 (issue `#1` closed). Section retitled "Resolved Design Decisions".
 - 2026-05-01: Implementation landed (#32, #35, #36, #38). Added "Decisions Discovered During Implementation" section capturing the loopback-wiring revision, systemd User= templating, absolute uv ExecStart, SIGTERM handler, partial-init cleanup, hardware-skip conftest, and the wider apt prereq list. Status remains Approved pending Pi reboot persistence and Codex MCP smoke per `tasks.md` task 10.
+- 2026-05-01: Closeout (issue `#9`) complete. Pi reboot persistence and Codex MCP smoke both passed. Status flipped from Approved to Implemented; Last reviewed bumped to 2026-05-01.

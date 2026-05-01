@@ -36,63 +36,60 @@ Before implementation, read:
 
 ## Current Status
 
-Milestone 1 specs are approved. Implementation is in progress.
+Milestone 1 (Raspberry Pi I/O MCP server) is **Implemented** on `main` as of
+2026-05-01. The feature spec under `specs/features/rpi-io-mcp/` is at
+`Status: Implemented`. The project-level spec at `specs/project.spec.md`
+remains `Status: Approved` because broader project scope (CC2531/Zigbee,
+future WiFi/BLE/Z-Wave connectivity, and the LLM agent layer) is not yet
+implemented.
 
-GitHub issue `#2`, "Scaffold Python project with uv and dependencies", is the first implementation task. GitHub issues `#2` through `#9` have native issue Relationships configured from their `Blocked by:` notes; only start an issue whose blockers are closed.
+GitHub issues `#1` through `#9` are closed. All four Milestone 1 acceptance
+gates passed on the live Pi (host coordinates in local `.env`):
 
-Already created:
+- Automated MacBook E2E loopback: 12/12 PASS via `--run-hardware`.
+- Manual multimeter smoke (`tools/smoke_meter.py`): 5/5 PASS.
+- Pi reboot persistence: `sudo reboot`; systemd autostarted the service with
+  GPIO23 reset to safe-default 0; E2E rerun green.
+- Codex MCP smoke: `codex mcp add rpi-io --url http://<raspberry-pi-ip>:8000/mcp`;
+  fresh Codex session called `rpi-io.list_devices` and received both
+  configured devices.
+
+Repository infrastructure in place:
 
 - SDD workflow and specs.
-- Approved Milestone 1 Raspberry Pi I/O MCP requirements, design, and task plan.
-- GitHub implementation issues `#1` through `#9`.
-- Claude Code reviewer workflows and repository review guidance.
-- CI workflow running `pytest` on pull requests and pushes to `main`.
-- Auto-merge workflow gated on `pytest` + `claude-review`, opt-out via `critical`, `needs-manual-verification`, or `do-not-merge` labels on the PR or any linked issue. See `docs/agent-pr-workflow.md`.
-- `.gitignore`
-- `.env.example`
-- `config/rpi-io.toml`
-- `tools/find_raspberry.py`
-- `tests/test_find_raspberry.py`
+- Claude Code reviewer workflow + Copilot inline reviewer; both gate auto-merge.
+- CI workflow running `uv run pytest -m "not e2e and not hardware"` on PRs and pushes to `main`.
+- Auto-merge workflow gated on `pytest` + `claude-review` + zero unresolved Copilot review threads, opt-out via `critical`, `needs-manual-verification`, or `do-not-merge` labels on the PR or any linked issue. See `docs/agent-pr-workflow.md`.
+- `.gitignore`, `.env.example`, `config/rpi-io.toml`, `tools/find_raspberry.py`, `tools/smoke_meter.py`.
 
-Verified:
+Implemented for Milestone 1:
 
-```bash
-python3 -m pytest tests/test_find_raspberry.py
-python3 -m py_compile tools/find_raspberry.py tests/test_find_raspberry.py
-python3 tools/find_raspberry.py --help
-```
-
-Not implemented yet:
-
-- Python project scaffold and dependencies.
-- MCP server.
-- Device registry.
-- GPIO adapter.
-- Unit tests for MCP/GPIO behavior.
-- MacBook E2E MCP tests.
-- systemd service and deployment docs/scripts.
-- Manual smoke test docs.
+- Python project scaffold with `uv` and `uv.lock`.
+- `src/perseus_smarthome/` — `config.py`, `devices.py`, `gpio.py` (mock + GPIO Zero adapter), `service.py`, `server.py` (FastMCP streamable HTTP).
+- 118 unit tests across config, devices, gpio, service, mcp_server, find_raspberry.
+- MacBook E2E suite at `tests/e2e/test_rpi_io_mcp.py` with `--run-hardware` opt-in for loopback tests.
+- systemd service at `deploy/systemd/rpi-io-mcp.service`, deploy script at `scripts/deploy_rpi_io_mcp.sh`, deployment guide at `docs/deployment.md`, manual smoke guide at `docs/manual-smoke-tests.md`.
 
 ## What To Do Next
 
-Follow `specs/features/rpi-io-mcp/tasks.md` and GitHub issue Relationships in order.
+Milestone 1 is complete. Future milestones (not yet specified or scheduled)
+will likely cover:
 
-Recommended next implementation plan:
+- CC2531 USB stick connectivity and Zigbee device support (see `specs/project.spec.md` Open Questions).
+- Additional connectivity protocols: WiFi, BLE, Z-Wave.
+- LLM agent layer that consumes the MCP tool contract.
+- Persistence of device state and action history (currently process-local).
+- Optional human UI for diagnostics.
 
-1. Implement issue `#2`: scaffold Python project with `uv` -> verify: `uv run pytest` works.
-2. Implement config/device registry (`#3`) -> verify: unit tests for `config/rpi-io.toml` and wrong-device cases.
-3. Implement GPIO adapter boundary and mock adapter (`#4`) -> verify: unit tests without Raspberry Pi hardware.
-4. Implement MCP HTTP server tools (`#5`) -> verify: unit tests for `health`, `list_devices`, `set_output`, `read_input`.
-5. Add E2E tests (`#6`) -> verify: command accepts `RPI_MCP_URL`.
-6. Add systemd/deploy docs/scripts (`#7`) -> verify: static review locally, runtime check later on Pi.
-7. Document manual smoke tests (`#8`) -> verify: docs land and a smoke run on the Pi succeeds.
-8. Close out specs (`#9`) -> move spec statuses from `Approved` to `Implemented` after acceptance criteria are verified.
+When a new milestone is opened, follow the SDD workflow in
+`docs/sdd-workflow.md`: write or extend the spec first, get owner approval,
+then break into small implementation issues.
 
-Full acceptance later requires the Raspberry Pi to be connected and wired:
+To re-verify the deployed Milestone 1 stack on the Pi:
 
 ```bash
 python3 tools/find_raspberry.py --subnet <lan-cidr>
-RPI_MCP_URL=http://<raspberry-pi-ip>:8000/mcp uv run pytest tests/e2e/test_rpi_io_mcp.py
+RPI_MCP_URL=http://<raspberry-pi-ip>:8000/mcp uv run pytest tests/e2e/ --run-hardware
 codex mcp add rpi-io --url http://<raspberry-pi-ip>:8000/mcp
 ```
 

@@ -1,6 +1,6 @@
 # Raspberry Pi I/O MCP Server Tasks
 
-Status: Approved
+Status: Implemented
 Last reviewed: 2026-05-01  
 Owner: Vadim  
 Requirements: requirements.md  
@@ -19,16 +19,14 @@ This milestone is complete when:
 
 ## Current Status
 
-- Milestone 1 requirements, design, and task plan are approved (issue `#1` closed 2026-04-30).
-- Tasks 1–9 implemented and merged to `main` across PRs #18, #21, #22, #28, #29, #31, #32, #35, #36, #38.
-- Hardware verification on the live Pi (172.16.0.101, user `perseus`) is partially complete:
+- Milestone 1 requirements, design, and task plan are Implemented (issue `#1` closed 2026-04-30; closeout issue `#9` closed 2026-05-01).
+- Tasks 1–9 implemented and merged to `main` across PRs #18, #21, #22, #28, #29, #31, #32, #35, #36, #38; closeout (task 10) merged via the PR closing issue `#9` on 2026-05-01.
+- All four hardware/client acceptance gates passed on the live Pi (host coordinates in local `.env`):
   - Automated MacBook E2E loopback (jumper-wired): 12/12 PASS via `--run-hardware`.
   - Manual multimeter smoke (`tools/smoke_meter.py`): 5/5 PASS.
-  - systemd service: installed, `systemctl is-active` → `active`, MCP endpoint reachable.
-- Two acceptance gates outstanding before flipping spec status to Implemented:
-  - **Pi reboot persistence check** — full `sudo reboot`; verify systemd autostarts the service and GPIO23 is at safe-default 0 before E2E tests run.
-  - **Codex MCP smoke** — `codex mcp add rpi-io --url ...`, new Codex session, list/call tools.
-- Closeout (task 10) lands once both gates are signed off.
+  - Pi reboot persistence: `sudo reboot`; systemd autostarted the service with GPIO23 at safe-default 0; E2E rerun green.
+  - Codex MCP smoke: `codex mcp add rpi-io --url http://<raspberry-pi-ip>:8000/mcp` (URL from local `.env`'s `RPI_MCP_URL`); fresh Codex session invoked `rpi-io.list_devices` and received both devices with capabilities and states. The Codex TUI `/mcp` panel does not render user-registered streamable HTTP servers in this CLI version (0.125.0); discoverability and invocation work — verified via tool call.
+- systemd service: installed, `systemctl is-active` → `active`, MCP endpoint reachable across reboot.
 
 ## GitHub Implementation Issues
 
@@ -44,8 +42,9 @@ This milestone is complete when:
 
 ## Implementation Tasks
 
-Per-task status as of 2026-05-01: tasks 1–9 are **Done** on `main`. Task 10 is
-**In progress** (this work + the Pi reboot persistence and Codex smoke gates).
+Per-task status as of 2026-05-01: tasks 1–10 are **Done** on `main`. All four
+acceptance gates (automated E2E, manual GPIO smoke, Pi reboot persistence,
+Codex MCP smoke) signed off on 2026-05-01.
 
 1. Project scaffold (Done — PR #18)
 
@@ -114,7 +113,7 @@ RPI_MCP_URL=http://<raspberry-pi-ip>:8000/mcp uv run pytest tests/e2e/test_rpi_i
 - Ensure service restarts on failure.
 - Document logs via `journalctl`.
 
-8. Raspberry Pi discovery tool (Done — `tools/find_raspberry.py` shipped before Milestone 1 implementation began; verified on the LAN at 172.16.0.101)
+8. Raspberry Pi discovery tool (Done — `tools/find_raspberry.py` shipped before Milestone 1 implementation began; verified on the LAN against the Pi recorded in local `.env`)
 
 - Implement `tools/find_raspberry.py`.
 - Support hostname lookup, explicit subnet scanning, SSH probing, ARP/MAC enrichment, JSON output, and safe `.env` updates.
@@ -146,28 +145,25 @@ codex mcp get rpi-io
 
 - Record that a new Codex session is required before tools are available.
 
-10. Documentation closeout (In progress — issue #9)
+10. Documentation closeout (Done — issue `#9`, 2026-05-01)
 
-Already done as of 2026-05-01:
+Closeout work landed in the PR closing issue `#9`:
 
-- `specs/project.spec.md` — Related code and Related tests filled with the implemented files.
-- `specs/features/rpi-io-mcp/requirements.md` — Related code and Related tests filled.
-- `specs/features/rpi-io-mcp/design.md` — "Decisions Discovered During Implementation" section captures work-time choices: loopback-wiring revision, systemd User= templating, absolute uv ExecStart, SIGTERM handler, partial-init cleanup, hardware-skip conftest, and the wider apt prereqs list.
-- `docs/deployment.md` — apt prereqs corrected to include `swig` and `liblgpio-dev`.
+- `specs/project.spec.md` — Related code/tests fields populated; Change Log entry records Milestone 1 final verification. Project spec stays `Approved` (project scope still includes future-milestone CC2531/Zigbee/WiFi/BLE/Z-Wave work and the LLM agent layer, none of which are implemented yet).
+- `specs/features/rpi-io-mcp/requirements.md` — Status flipped to `Implemented`; Related code/tests already populated; Change Log entry added.
+- `specs/features/rpi-io-mcp/design.md` — Status flipped to `Implemented`; Last reviewed bumped; "Decisions Discovered During Implementation" section already captured work-time choices (loopback-wiring revision, systemd User= templating, absolute uv ExecStart, SIGTERM handler, partial-init cleanup, hardware-skip conftest, wider apt prereqs).
+- `specs/features/rpi-io-mcp/tasks.md` — Status flipped to `Implemented`; Current Status records all four gates green.
+- `AGENTS.md` — Current Status section updated from "Implementation is in progress" to Milestone 1 implemented + verified; "Not implemented yet" list converted to a Milestone 1 completion summary.
+- `docs/deployment.md` — apt prereqs corrected to include `swig` and `liblgpio-dev` (already merged via PR #39).
 
-Pending before flipping `Status: Approved` → `Status: Implemented` on this file
-plus `requirements.md` and `design.md`:
+Acceptance gates signed off on 2026-05-01:
 
-- Pi reboot persistence check: `sudo reboot` the Pi, wait for boot, run
-  `RPI_MCP_URL=http://<pi>:8000/mcp uv run pytest tests/e2e/ --run-hardware`
-  from the MacBook and confirm the systemd unit autostarted the service with
-  GPIO23 reset to 0.
-- Codex MCP smoke: `codex mcp add rpi-io --url http://<pi>:8000/mcp`,
-  `codex mcp list`, `codex mcp get rpi-io`, then start a fresh Codex session
-  and confirm the tools list and call cleanly.
-- Update Status fields on `requirements.md`, `design.md`, and this `tasks.md`
-  to `Implemented`. Update Last reviewed dates. Add Change Log entries.
-- Close issue #9.
+- Automated MacBook E2E `--run-hardware`: 12/12 PASS.
+- Manual GPIO smoke (multimeter via `tools/smoke_meter.py`): 5/5 PASS.
+- Pi reboot persistence: `sudo reboot`; systemd autostart confirmed; GPIO23 reset to 0; E2E rerun green.
+- Codex MCP smoke: `codex mcp add rpi-io --url http://<raspberry-pi-ip>:8000/mcp` (URL from local `.env`'s `RPI_MCP_URL`); fresh Codex session called `rpi-io.list_devices` and received both configured devices with capabilities and states.
+
+Issue `#9` closed on merge.
 
 ## Remaining Decisions Before Code
 
@@ -178,3 +174,4 @@ None for Milestone 1 implementation.
 - 2026-04-30: Added GitHub issue mapping and clarified that implementation remains blocked until owner approval.
 - 2026-04-30: Owner approved Milestone 1 specs (issue `#1` closed). Status flipped to Approved; implementation begins with `#2`.
 - 2026-05-01: Tasks 1–9 implemented and merged. Per-task PR pointers and "Done" markers added. Task 10 in progress; spec status flip to Implemented deferred until Pi reboot persistence and Codex MCP smoke are signed off (issue #9).
+- 2026-05-01: Closeout (task 10) complete. All four acceptance gates green (automated E2E 12/12, multimeter smoke 5/5, Pi reboot persistence, Codex MCP smoke). Status flipped from Approved to Implemented. Issue `#9` closed.
