@@ -17,12 +17,26 @@ if [ -z "${VERSION}" ]; then
 fi
 echo "==> Version: ${VERSION}"
 
-PKG_NAME="perseus-smarthome_${VERSION}_armhf"
+# ---------------------------------------------------------------------------
+# 2. Verify build architecture
+# ---------------------------------------------------------------------------
+if ! command -v dpkg >/dev/null 2>&1; then
+  echo "ERROR: dpkg is required to determine the Debian package architecture" >&2
+  exit 1
+fi
+BUILD_ARCH="$(dpkg --print-architecture)"
+if [ "${BUILD_ARCH}" != "armhf" ]; then
+  echo "ERROR: unsupported build architecture '${BUILD_ARCH}'; this package must be built on armhf" >&2
+  exit 1
+fi
+echo "==> Debian architecture: ${BUILD_ARCH}"
+
+PKG_NAME="perseus-smarthome_${VERSION}_${BUILD_ARCH}"
 BUILD_DIR="${REPO_ROOT}/_build/${PKG_NAME}"
 DIST_DIR="${REPO_ROOT}/dist"
 
 # ---------------------------------------------------------------------------
-# 2. Drift check: packaged unit must match canonical unit post-User-substitution
+# 3. Drift check: packaged unit must match canonical unit post-User-substitution
 #
 # The only permitted difference between the two files is the User= line:
 #   canonical:  User=pi
@@ -51,13 +65,17 @@ fi
 echo "==> Drift check passed: packaged unit matches canonical unit."
 
 # ---------------------------------------------------------------------------
-# 3. Verify apt dependencies can be resolved on the build host
+# 4. Verify apt dependencies can be resolved on the build host
+# Parse the package names from the Depends: line in the control template so
+# there is one source of truth instead of a hardcoded duplicate list here.
 # ---------------------------------------------------------------------------
-DEPENDS="liblgpio1 libffi8 adduser systemd libc6 python3"
+DEPENDS_LINE=$(awk '/^Depends:/ { gsub(/^Depends:[[:space:]]*/, ""); print }' "${SCRIPT_DIR}/debian/control")
 echo "==> Checking apt dependency resolution..."
-for pkg in ${DEPENDS}; do
-  # Strip version constraint for lookup (e.g. "python3 (>= 3.13)" -> "python3")
-  base_pkg="${pkg%%[[:space:]]*}"
+IFS=',' read -r -a dep_entries <<< "${DEPENDS_LINE}"
+for entry in "${dep_entries[@]}"; do
+  # Extract first word from each entry (strips version constraints like "(>= 3.13)").
+  base_pkg=$(printf '%s' "${entry}" | awk '{print $1}')
+  [ -z "${base_pkg}" ] && continue
   if ! apt-cache show "${base_pkg}" >/dev/null 2>&1; then
     echo "ERROR: apt dependency '${base_pkg}' cannot be resolved on this host." >&2
     echo "       Run on a Raspberry Pi with the correct apt index." >&2
@@ -67,7 +85,7 @@ done
 echo "==> All apt dependencies resolved."
 
 # ---------------------------------------------------------------------------
-# 4. Resolve maintainer identity
+# 5. Resolve maintainer identity
 # ---------------------------------------------------------------------------
 if [ -n "${DEB_MAINTAINER:-}" ]; then
   MAINTAINER="${DEB_MAINTAINER}"
@@ -93,7 +111,7 @@ esac
 echo "==> Maintainer: ${MAINTAINER}"
 
 # ---------------------------------------------------------------------------
-# 5. Stage the build tree
+# 6. Stage the build tree
 # ---------------------------------------------------------------------------
 echo "==> Staging build tree in ${BUILD_DIR}..."
 rm -rf "${BUILD_DIR}"
@@ -118,7 +136,7 @@ rsync -a --delete \
 cp "${PACKAGED_UNIT}" "${BUILD_DIR}/etc/systemd/system/rpi-io-mcp.service"
 
 # ---------------------------------------------------------------------------
-# 6. Build the virtualenv into the staged tree
+# 7. Build the virtualenv into the staged tree
 # ---------------------------------------------------------------------------
 echo "==> Running uv sync --no-dev into staged tree..."
 if [ ! -f "${REPO_ROOT}/uv.lock" ]; then
@@ -133,14 +151,20 @@ fi
 echo "==> venv built."
 
 # ---------------------------------------------------------------------------
-# 7. Assemble DEBIAN/ control files
+# 8. Assemble DEBIAN/ control files
 # ---------------------------------------------------------------------------
 echo "==> Assembling DEBIAN/ control files..."
 
+# Escape characters that are meaningful to sed's replacement string when using
+# '|' as the delimiter: '|', '&', and '\'.  This prevents a maintainer name
+# or email containing any of those characters from corrupting the control file.
+ESCAPED_VERSION=$(printf '%s' "${VERSION}"    | sed 's/[|&\]/\\&/g')
+ESCAPED_MAINTAINER=$(printf '%s' "${MAINTAINER}" | sed 's/[|&\]/\\&/g')
+
 # Render control with real version and maintainer
 sed \
-  -e "s/__VERSION__/${VERSION}/" \
-  -e "s/__MAINTAINER__/${MAINTAINER}/" \
+  -e "s|__VERSION__|${ESCAPED_VERSION}|" \
+  -e "s|__MAINTAINER__|${ESCAPED_MAINTAINER}|" \
   "${SCRIPT_DIR}/debian/control" > "${BUILD_DIR}/DEBIAN/control"
 
 cp "${SCRIPT_DIR}/debian/conffiles" "${BUILD_DIR}/DEBIAN/conffiles"
@@ -150,7 +174,7 @@ cp "${SCRIPT_DIR}/debian/prerm"     "${BUILD_DIR}/DEBIAN/prerm"
 cp "${SCRIPT_DIR}/debian/postrm"    "${BUILD_DIR}/DEBIAN/postrm"
 
 # ---------------------------------------------------------------------------
-# 8. Set maintainer-script permissions
+# 9. Set maintainer-script permissions
 # ---------------------------------------------------------------------------
 chmod 0755 \
   "${BUILD_DIR}/DEBIAN/preinst" \
@@ -159,16 +183,16 @@ chmod 0755 \
   "${BUILD_DIR}/DEBIAN/postrm"
 
 # ---------------------------------------------------------------------------
-# 9. Build the .deb
+# 10. Build the .deb
 # ---------------------------------------------------------------------------
 mkdir -p "${DIST_DIR}"
-DEB_PATH="${DIST_DIR}/perseus-smarthome_${VERSION}_armhf.deb"
+DEB_PATH="${DIST_DIR}/perseus-smarthome_${VERSION}_${BUILD_ARCH}.deb"
 
 echo "==> Building ${DEB_PATH}..."
 dpkg-deb --build --root-owner-group "${BUILD_DIR}" "${DEB_PATH}"
 
 # ---------------------------------------------------------------------------
-# 10. Inspect the result
+# 11. Inspect the result
 # ---------------------------------------------------------------------------
 echo ""
 echo "==> Package info (dpkg-deb -I):"

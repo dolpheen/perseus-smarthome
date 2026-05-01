@@ -9,14 +9,18 @@ set -e
 # Note: the install root is /opt/raspberry-smarthome (historical directory
 # name from Milestone 1) while the package name is perseus-smarthome.  Both
 # names refer to the same project; the directory name predates the .deb path.
-if [ -d /opt/raspberry-smarthome ]; then
-  pkg_status=$(dpkg-query -W -f='${Status}' perseus-smarthome 2>/dev/null || true)
-  case "$pkg_status" in
-    "install ok installed") : ;;
-    *)
-      echo "Found a non-package install at /opt/raspberry-smarthome." >&2
-      echo "Run 'sudo make uninstall PURGE=1' first, then retry." >&2
-      exit 1
-      ;;
-  esac
-fi
+case "$1" in
+  install)
+    if [ -d /opt/raspberry-smarthome ]; then
+      pkg_status=$(dpkg-query -W -f='${Status}' perseus-smarthome 2>/dev/null || true)
+      case "$pkg_status" in
+        "install ok installed") : ;;
+        *)
+          echo "Found a non-package install at /opt/raspberry-smarthome." >&2
+          echo "Run 'sudo ./scripts/install.sh uninstall --purge' first, then retry." >&2
+          exit 1
+          ;;
+      esac
+    fi
+    ;;
+esac
