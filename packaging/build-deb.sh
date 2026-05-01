@@ -162,8 +162,12 @@ fi
 echo "==> Rewriting venv build-path references to runtime path..."
 RUNTIME_ROOT="/opt/raspberry-smarthome"
 BUILD_OPT_ROOT="${BUILD_DIR}/opt/raspberry-smarthome"
-ESCAPED_BUILD=$(printf '%s' "${BUILD_OPT_ROOT}" | sed 's/[\/&]/\\&/g')
-ESCAPED_RUNTIME=$(printf '%s' "${RUNTIME_ROOT}" | sed 's/[\/&]/\\&/g')
+# Escape every metachar that would corrupt the sed replacement: the `|`
+# delimiter used below, the `/` path separator, the `&` back-reference,
+# and the literal `\`. Without `|`, a future build path containing `|`
+# would silently truncate the replacement text.
+ESCAPED_BUILD=$(printf '%s' "${BUILD_OPT_ROOT}" | sed 's/[|\/&\\]/\\&/g')
+ESCAPED_RUNTIME=$(printf '%s' "${RUNTIME_ROOT}" | sed 's/[|\/&\\]/\\&/g')
 while IFS= read -r f; do
   [ -L "$f" ] && continue
   sed -i "s|${ESCAPED_BUILD}|${ESCAPED_RUNTIME}|g" "$f"

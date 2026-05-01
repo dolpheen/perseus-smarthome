@@ -630,6 +630,10 @@ Environment=LG_WD=/run/rpi-io-mcp
 `/run/rpi-io-mcp` is created by systemd at service start, owned by the
 effective `User=`, and torn down on stop, so both install paths get a
 guaranteed-writable work dir without depending on `$HOME` semantics.
+With `LG_WD` declared in the unit, the previous `$HOME` fallback no
+longer applies on either path — a deploy user whose home is read-only,
+on a network filesystem, or absent will not silently fall through to
+`NativeFactory`.
 
 ### 4. Script `User=` rewrite is broader than the spec snippet
 

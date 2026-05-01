@@ -4,9 +4,11 @@ from __future__ import annotations
 
 import textwrap
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 
+from perseus_smarthome import config as config_module
 from perseus_smarthome.config import ConfigError, load_config
 
 
@@ -218,6 +220,72 @@ def test_load_config_rejects_device_boolean_pin(tmp_path: Path) -> None:
     )
     with pytest.raises(ConfigError, match="non-integer pin"):
         load_config(cfg)
+
+
+def _write_minimal_config(path: Path) -> None:
+    path.write_text(
+        textwrap.dedent("""\
+            [gpio]
+            numbering = "BCM"
+
+            [[devices]]
+            id = "gpio23_output"
+            name = "GPIO23 Output"
+            kind = "output"
+            pin = 23
+        """),
+        encoding="utf-8",
+    )
+
+
+def test_default_config_path_prefers_repo_relative_when_available(tmp_path: Path) -> None:
+    """Editable install layout: parents[2]/config/rpi-io.toml exists -> wins."""
+    fake_module_file = tmp_path / "src" / "perseus_smarthome" / "config.py"
+    fake_module_file.parent.mkdir(parents=True)
+    fake_module_file.touch()
+    repo_config = tmp_path / "config" / "rpi-io.toml"
+    repo_config.parent.mkdir()
+    _write_minimal_config(repo_config)
+    with patch.object(config_module, "__file__", str(fake_module_file)):
+        assert config_module._default_config_path() == repo_config
+
+
+def test_default_config_path_falls_back_to_cwd_for_wheel_install(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Wheel install layout: parents[2] is python3.13/, no repo config -> CWD branch."""
+    wheel_module_file = (
+        tmp_path / "venv" / "lib" / "python3.13" / "site-packages" /
+        "perseus_smarthome" / "config.py"
+    )
+    wheel_module_file.parent.mkdir(parents=True)
+    wheel_module_file.touch()
+    cwd_root = tmp_path / "service-cwd"
+    cwd_config = cwd_root / "config" / "rpi-io.toml"
+    cwd_config.parent.mkdir(parents=True)
+    _write_minimal_config(cwd_config)
+    monkeypatch.chdir(cwd_root)
+    with patch.object(config_module, "__file__", str(wheel_module_file)):
+        assert config_module._default_config_path() == cwd_config
+
+
+def test_default_config_path_falls_back_to_canonical_install_root(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """No repo-local, no CWD-local -> canonical /opt/raspberry-smarthome path."""
+    wheel_module_file = (
+        tmp_path / "venv" / "lib" / "python3.13" / "site-packages" /
+        "perseus_smarthome" / "config.py"
+    )
+    wheel_module_file.parent.mkdir(parents=True)
+    wheel_module_file.touch()
+    empty_cwd = tmp_path / "empty-cwd"
+    empty_cwd.mkdir()
+    monkeypatch.chdir(empty_cwd)
+    with patch.object(config_module, "__file__", str(wheel_module_file)):
+        assert config_module._default_config_path() == Path(
+            "/opt/raspberry-smarthome/config/rpi-io.toml"
+        )
 
 
 def test_load_config_rejects_device_unsupported_kind(tmp_path: Path) -> None:
