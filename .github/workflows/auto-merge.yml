@@ -5,6 +5,13 @@ on:
     types: [opened, reopened, synchronize, ready_for_review, labeled, unlabeled]
   pull_request_review:
     types: [submitted]
+  # Re-evaluate when a maintainer marks a Copilot review thread Resolved (or
+  # un-resolves one). Without this trigger the new copilot-pull-request-reviewer
+  # gate added in PR #40 would leave PRs stuck after thread resolution: none of
+  # the other events fire on resolve, and `workflow_run` for CI/Claude Code
+  # Review only re-runs on a fresh push.
+  pull_request_review_thread:
+    types: [resolved, unresolved]
   workflow_run:
     workflows: ["CI", "Claude Code Review"]
     types: [completed]
@@ -33,7 +40,7 @@ jobs:
         run: |
           set -euo pipefail
           case "${{ github.event_name }}" in
-            pull_request|pull_request_review)
+            pull_request|pull_request_review|pull_request_review_thread)
               echo "number=${{ github.event.pull_request.number }}" >> "$GITHUB_OUTPUT"
               ;;
             workflow_run)

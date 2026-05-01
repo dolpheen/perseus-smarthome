@@ -15,7 +15,7 @@ How issues turn into merged code in this repo. Read this before opening a PR.
    - no opt-out label is set on the PR or any linked issue, and
    - every `copilot-pull-request-reviewer[bot]` inline review thread on the PR is marked Resolved (see [Parallel Reviewers](#parallel-reviewers)).
 
-   It re-evaluates automatically when `CI` or `Claude Code Review` completes (via `workflow_run`), so a green PR merges without any manual nudge once all three conditions are met.
+   It re-evaluates automatically on the events that change any of those conditions: `workflow_run` for `CI` and `Claude Code Review` completion, `pull_request` for label / draft / push transitions, and `pull_request_review_thread` for thread resolve/unresolve. So a green PR merges without any manual nudge once all three conditions are met — including when a maintainer's only remaining action is resolving the last Copilot thread.
 
 ## Opt-out Labels
 
