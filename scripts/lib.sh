@@ -19,7 +19,7 @@ die() {
 # require_root → exits with a clear error when not running as UID 0.
 require_root() {
   if [[ "${EUID:-$(id -u)}" -ne 0 ]]; then
-    die "This script must be run as root or with sudo. Re-run: sudo $0 $*"
+    die "This script must be run as root or with sudo."
   fi
 }
 

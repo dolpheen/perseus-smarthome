@@ -172,7 +172,7 @@ def test_install_sh_no_subcommand_exits_nonzero():
         text=True,
     )
     assert result.returncode != 0
-    assert "Usage" in result.stderr or "usage" in result.stderr.lower()
+    assert "usage" in result.stderr.lower()
 
 
 def test_install_sh_unknown_subcommand_exits_nonzero():

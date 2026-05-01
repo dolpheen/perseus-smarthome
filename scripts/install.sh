@@ -99,7 +99,7 @@ cmd_install() {
   if [[ -f /etc/debian_version ]]; then
     local deb_ver
     deb_ver="$(cat /etc/debian_version)"
-    if ! grep -q 'trixie\|13' /etc/os-release 2>/dev/null && \
+    if ! grep -qE 'trixie|13' /etc/os-release 2>/dev/null && \
        ! echo "${deb_ver}" | grep -qE '^13|trixie'; then
       log "WARNING: Host OS does not appear to be Debian Trixie (detected: ${deb_ver}). Continuing anyway."
     fi
@@ -283,7 +283,11 @@ cmd_uninstall() {
     esac
   done
 
-  log "Starting uninstall${purge:+ (--purge)}"
+  local purge_label=""
+  if [[ "${purge}" -eq 1 ]]; then
+    purge_label=" (--purge)"
+  fi
+  log "Starting uninstall${purge_label}"
 
   # DEP-FR-011: root required
   require_root
