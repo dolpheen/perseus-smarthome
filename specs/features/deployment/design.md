@@ -261,7 +261,7 @@ Read-only. Prints:
 
 - `log "step description"` → `printf '==> %s\n' "$*"`.
 - `die "msg"` → log to stderr and exit 1.
-- `require_root` → ensure UID 0 or re-exec under sudo with confirmation.
+- `require_root` → ensure UID 0; exit with a clear error if not.
 - `apt_missing pkg ...` → echo only the packages not currently installed.
 
 ## Wrapper: `scripts/remote-install.sh`
