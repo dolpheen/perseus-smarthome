@@ -1,6 +1,6 @@
 # Deployment Optimization Design
 
-Status: Approved
+Status: Implemented
 Last reviewed: 2026-05-01  
 Owner: Vadim  
 Requirements: requirements.md
@@ -565,6 +565,116 @@ Manual operator checks:
   active state in under five minutes (excluding the first armv7l source
   build of `lgpio` which is dominated by I/O on Pi 2).
 
+## Decisions Discovered During Implementation
+
+These adjustments came out of the `#48` closeout run on a live Pi. They
+correct bugs that the previous `Approved` design glossed over, and they
+become binding alongside the original design now that it is `Implemented`.
+
+### 1. Bundled venv must be relocated at build time
+
+Original text: "the `.deb` path bundles the venv at exactly this location;
+the script path runs `uv sync --no-dev` which also populates this location."
+
+`uv sync` builds the venv with the absolute path of the build directory
+baked into every entry-point shebang and into bookkeeping files like
+`direct_url.json` and any editable `.pth` pointer. When `dpkg-deb` later
+unpacks the payload at `/opt/raspberry-smarthome/.venv`, those shebangs
+still point at `_build/perseus-smarthome_<ver>_armhf/opt/raspberry-smarthome/.venv/bin/python`
+on the build host, so systemd's `Exec` exits 203/EXEC ("interpreter not
+found"). The fix has two parts and both live in `packaging/build-deb.sh`:
+
+- Use `uv sync --no-dev --no-editable` so the project is installed as a
+  proper wheel inside `site-packages` and no `_editable_impl_*.pth`
+  pointer is left at the build-tree source path.
+- After `uv sync`, sweep every text file under
+  `${BUILD_DIR}/opt/raspberry-smarthome/.venv` that contains the build
+  prefix and rewrite it to the runtime prefix (`/opt/raspberry-smarthome`).
+  Symlinks are skipped; the sweep handles `.venv/bin/*` shebangs and
+  metadata files in equal measure.
+
+The script-install path is unaffected because `uv sync` runs in place at
+the runtime path on the Pi.
+
+### 2. `config.py` default config path is wheel-aware
+
+`Path(__file__).resolve().parents[2] / "config" / "rpi-io.toml"` resolved
+to `/opt/raspberry-smarthome/config/rpi-io.toml` for editable installs
+(parents[2] is the repo root) but to
+`/opt/raspberry-smarthome/.venv/lib/python3.13/config/rpi-io.toml` for
+the `.deb`'s wheel-installed package (parents[2] is `python3.13/`),
+producing a `FileNotFoundError` at service startup. `config.py` now
+chains three resolution strategies — repo-relative (editable / dev),
+CWD-relative (the systemd unit sets `WorkingDirectory=/opt/raspberry-smarthome`),
+and the canonical install path as a final fallback. Callers that already
+pass an explicit `path` are unchanged.
+
+### 3. systemd unit declares an lgpio work directory
+
+`gpiozero`'s `lgpio` backend creates notification FIFOs under
+`$LG_WD`, falling back to `$HOME`. The script-install path's deploy user
+has a writable `$HOME` (`/home/<user>`) so the FIFOs land there and
+`LGPIOFactory` initializes cleanly. The `.deb` path's `perseus-smarthome`
+system user has `$HOME=/opt/raspberry-smarthome`, but lgpio's work-dir
+helper failed to chmod a FIFO under that path under the service's reduced
+environment and silently fell through to gpiozero's experimental
+`NativeFactory` — which logs no error visible after warnings, returns
+`ok` for `set_output`, and never drives the pins. The canonical unit
+(and the packaged copy) now adds:
+
+```ini
+RuntimeDirectory=rpi-io-mcp
+Environment=LG_WD=/run/rpi-io-mcp
+```
+
+`/run/rpi-io-mcp` is created by systemd at service start, owned by the
+effective `User=`, and torn down on stop, so both install paths get a
+guaranteed-writable work dir without depending on `$HOME` semantics.
+
+### 4. Script `User=` rewrite is broader than the spec snippet
+
+`scripts/install.sh` step 7 uses `s|^User=.*|User=${DEPLOY_USER}|`, not
+the narrower `s|^User=pi$|...` shown in the original Behavior — install
+list. The broader regex is what the running implementation uses; it
+makes the upgrade path resilient against an existing unit whose `User=`
+was rewritten to a non-`pi` value by a previous install (re-running
+install must converge regardless of which user is currently in the
+unit). The narrower regex would silently fail to rewrite in that
+scenario and leave the upgrade running as the wrong user. The spec is
+updated here to record the actual pattern; the snippet under
+"Behavior — install" stays as a behavioural sketch and the
+implementation is canonical.
+
+### 5. `status` warns on missing `pyproject.toml`
+
+`scripts/install.sh status` reports `version: (unknown)` if
+`/opt/raspberry-smarthome/pyproject.toml` is absent. Implementations
+should additionally `log WARNING` in the missing-file branch so the
+operator's terminal trace makes the unknown value unambiguous; this is
+a small UX polish and does not change the documented contract.
+
+### 6. `prerm` `upgrade` arm is stop-only
+
+The original snippet under `## Debian Package :: prerm` stopped **and**
+disabled the service for `remove|upgrade|deconfigure`. The implementation
+disables only on `remove`; the `upgrade` arm stops the service but
+preserves its enabled state so the operator's `systemctl enable`
+posture survives a package upgrade. This matches Debian convention
+(only `remove` should clear the unit's enabled state) and is the more
+correct behaviour. The spec is updated to record stop-only-on-upgrade;
+the implementation is canonical.
+
+### 7. `make deb-install` resolves the latest deb deterministically
+
+The `Makefile` snippet originally showed
+`sudo apt install -y ./dist/perseus-smarthome_*_armhf.deb`. With more
+than one `.deb` in `dist/` the glob expands to multiple paths and `apt`
+either errors or installs all of them. The implementation uses
+`sudo apt install -y $(ls -t dist/perseus-smarthome_*_armhf.deb | head -1)`
+to pin the most recent build deterministically. The spec is updated to
+record this; both forms work for the single-build case the acceptance
+gate exercises.
+
 ## Open Questions
 
 None blocking. Possible follow-ups for a later iteration:
@@ -574,6 +684,16 @@ None blocking. Possible follow-ups for a later iteration:
   scope here; build host is the Pi for now).
 - Automate version bumping in `packaging/debian/changelog` from
   `pyproject.toml`.
+- `scripts/install.sh status`: split the systemd-`Active=` window from the
+  uvicorn-bind window when reporting reachability so a `200/406` first
+  poll does not race a cold start on Pi 2.
+- `scripts/install.sh status`: replace `awk \s` with `[[:space:]]` so
+  Trixie's default `mawk` parses the version line (`mawk` does not treat
+  `\s` as a class and prints empty for the current pattern).
+- `packaging/build-deb.sh`: locate `uv` robustly (e.g. via
+  `~/.local/bin/uv` fallback or a `bash -lc` profile sourcing) so
+  non-interactive builds do not need `PATH` to be set in the caller's
+  environment.
 
 ## Change Log
 
@@ -593,3 +713,13 @@ None blocking. Possible follow-ups for a later iteration:
   port read from `config/rpi-io.toml::server.port`; `Maintainer:` field
   in `control` made a build-time placeholder so personal contact details
   do not live in the spec.
+- 2026-05-01: Closeout (`#48`). Both install paths verified end-to-end on
+  the live Pi (12/12 acceptance gates green; see `requirements.md`
+  Change Log for the per-gate summary). Three Blocking bugs surfaced
+  during verification and were fixed in the closeout PR; the resolutions
+  are recorded above under "Decisions Discovered During Implementation"
+  and the Open Questions list grew three small follow-ups
+  (status reachability race, awk `\s` → `[[:space:]]`, build-deb `uv`
+  resolution). Round-2 deferred findings from PRs #52, #53, and #55 also
+  folded into "Decisions Discovered During Implementation". Status
+  flipped from Approved to Implemented.

@@ -7,7 +7,20 @@ from pathlib import Path
 from typing import Any
 
 
-DEFAULT_CONFIG_PATH = Path(__file__).resolve().parents[2] / "config" / "rpi-io.toml"
+def _default_config_path() -> Path:
+    # Editable install: parents[2] is the repo root (and dev-tree CWDs).
+    # Wheel install (e.g. .deb): parents[2] is python3.13/, so fall back to
+    # the systemd unit's WorkingDirectory and finally the canonical install root.
+    repo_local = Path(__file__).resolve().parents[2] / "config" / "rpi-io.toml"
+    if repo_local.is_file():
+        return repo_local
+    cwd_local = Path.cwd() / "config" / "rpi-io.toml"
+    if cwd_local.is_file():
+        return cwd_local
+    return Path("/opt/raspberry-smarthome/config/rpi-io.toml")
+
+
+DEFAULT_CONFIG_PATH = _default_config_path()
 
 _SUPPORTED_NUMBERING = {"BCM"}
 _SUPPORTED_DEVICE_KINDS = {"output", "input"}

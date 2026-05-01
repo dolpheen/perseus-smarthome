@@ -1,12 +1,12 @@
 # Deployment Optimization
 
-Status: Approved
+Status: Implemented
 Last reviewed: 2026-05-01  
 Owner: Vadim  
 Parent spec: ../../project.spec.md  
 Related feature: ../rpi-io-mcp/requirements.md  
-Related code: ../../../scripts/install.sh (planned, `#44`); ../../../scripts/lib.sh (planned, `#44`); ../../../scripts/remote-install.sh (planned, `#45`, replaces `scripts/deploy_rpi_io_mcp.sh`); ../../../Makefile (planned, `#46`); ../../../packaging/build-deb.sh (planned, `#47`); ../../../packaging/debian/ (planned, `#47`); ../../../deploy/systemd/rpi-io-mcp.service (modified, `#43`); ../../../docs/deployment.md (modified across `#43`/`#45`/`#46`)  
-Related tests: ../../../tests/scripts/ (planned, `#44`); existing `tests/e2e/test_rpi_io_mcp.py` is the verification harness for both install paths under `#48` (no functional changes — re-run with `--run-hardware` against each freshly installed Pi)
+Related code: ../../../scripts/install.sh; ../../../scripts/lib.sh; ../../../scripts/remote-install.sh; ../../../Makefile; ../../../packaging/build-deb.sh; ../../../packaging/debian/; ../../../deploy/systemd/rpi-io-mcp.service; ../../../src/perseus_smarthome/config.py (wheel-aware default config path, added in `#48` closeout); ../../../docs/deployment.md  
+Related tests: ../../../tests/scripts/test_lib_sh.py; the existing `tests/e2e/test_rpi_io_mcp.py` is the acceptance harness — re-run with `--run-hardware` against each freshly installed Pi.
 
 ## Summary
 
@@ -364,3 +364,22 @@ traceability. They are no longer open.
   attribution); `Open Questions` rewritten to record that all four
   questions were resolved in `design.md`; `#A`–`#F` placeholders
   replaced with the actual issue numbers `#43`–`#48`.
+- 2026-05-01: Closeout (`#48`). All twelve acceptance gates passed on
+  the live Pi. Script-install path (A1–A6): `make remote-install` from
+  the Mac, `systemctl is-active` → `active`, E2E `--run-hardware` 12/12,
+  reboot → autostart + GPIO23 safe-default 0 + E2E 12/12, idempotent
+  re-install (~32 s, no service downtime), `make remote-uninstall PURGE=1`
+  cleared install root and unit. Deb path (B1–B6): `make deb` produced
+  `perseus-smarthome_0.1.0_armhf.deb` with the expected `Depends:` and
+  `.venv/bin/rpi-io-mcp` in the payload, `apt install` brought the service
+  active under `User=perseus-smarthome`, E2E 12/12 pre- and post-reboot
+  (autostart + GPIO23 safe-default 0 confirmed), `apt remove` stopped the
+  service and removed the unit while preserving `/opt/raspberry-smarthome`
+  per Debian convention, `apt purge` removed the install root and the
+  `perseus-smarthome` system user. Three Blocking bugs surfaced and were
+  fixed in the closeout PR (bundled venv shebangs baked the build-host
+  path, `config.py` resolved the default path through `parents[2]` which
+  failed on wheel installs, and lgpio's notification work-dir defaulted
+  to `$HOME` which the system user could not write); see `design.md`
+  "Decisions Discovered During Implementation" for the resolutions.
+  Status flipped from Approved to Implemented.

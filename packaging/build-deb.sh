@@ -138,16 +138,37 @@ cp "${PACKAGED_UNIT}" "${BUILD_DIR}/etc/systemd/system/rpi-io-mcp.service"
 # ---------------------------------------------------------------------------
 # 7. Build the virtualenv into the staged tree
 # ---------------------------------------------------------------------------
-echo "==> Running uv sync --no-dev into staged tree..."
+echo "==> Running uv sync --no-dev --no-editable into staged tree..."
 if [ ! -f "${REPO_ROOT}/uv.lock" ]; then
   echo "ERROR: uv.lock not found at ${REPO_ROOT}/uv.lock." >&2
   echo "       Commit a current uv.lock before building the package." >&2
   exit 1
 fi
+# --no-editable installs the project as a wheel inside site-packages instead
+# of dropping a `.pth` pointer at the build directory. Without it, the
+# installed venv tries to import perseus_smarthome from a path that only
+# exists on the build host.
 (
   cd "${BUILD_DIR}/opt/raspberry-smarthome"
-  uv sync --no-dev
+  uv sync --no-dev --no-editable
 )
+
+# uv creates the venv with its absolute build-time path baked into every
+# entry-point shebang and into bookkeeping files like direct_url.json.
+# After dpkg-deb installs the payload, the venv sits at
+# /opt/raspberry-smarthome/.venv, so every reference to the build prefix
+# must be rewritten or the kernel exits 203/EXEC ("interpreter not found")
+# when systemd tries to spawn rpi-io-mcp.
+echo "==> Rewriting venv build-path references to runtime path..."
+RUNTIME_ROOT="/opt/raspberry-smarthome"
+BUILD_OPT_ROOT="${BUILD_DIR}/opt/raspberry-smarthome"
+ESCAPED_BUILD=$(printf '%s' "${BUILD_OPT_ROOT}" | sed 's/[\/&]/\\&/g')
+ESCAPED_RUNTIME=$(printf '%s' "${RUNTIME_ROOT}" | sed 's/[\/&]/\\&/g')
+while IFS= read -r f; do
+  [ -L "$f" ] && continue
+  sed -i "s|${ESCAPED_BUILD}|${ESCAPED_RUNTIME}|g" "$f"
+done < <(grep -rlF --binary-files=without-match "${BUILD_OPT_ROOT}" "${BUILD_OPT_ROOT}/.venv" 2>/dev/null || true)
+
 echo "==> venv built."
 
 # ---------------------------------------------------------------------------

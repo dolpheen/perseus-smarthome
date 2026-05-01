@@ -1,6 +1,6 @@
 # Deployment Optimization Tasks
 
-Status: Approved
+Status: Implemented
 Last reviewed: 2026-05-01  
 Owner: Vadim  
 Requirements: requirements.md  
@@ -38,25 +38,29 @@ gates spec status flip from Approved to Implemented.
 
 ## GitHub Implementation Issues
 
-Opened 2026-05-01 after owner approved the specs:
+Opened 2026-05-01 after owner approved the specs; closed by 2026-05-01:
 
-- `#43`: Refactor systemd unit `ExecStart` to `.venv/bin/rpi-io-mcp` and
-  drop the per-user `/home/<user>/` PATH dependency. Also expands
-  `.github/copilot-instructions.md` so subsequent deployment issues see
-  the new specs in the standing required-reading list. Lands first.
-- `#44`: Add `scripts/install.sh`, `scripts/lib.sh`, and the
-  `install`/`upgrade`/`uninstall`/`status` subcommands per `design.md`.
-  Blocked by `#43`.
-- `#45`: Replace `scripts/deploy_rpi_io_mcp.sh` with
+- `#43` (Done — PR #51): Refactor systemd unit `ExecStart` to
+  `.venv/bin/rpi-io-mcp` and drop the per-user `/home/<user>/` PATH
+  dependency. Also expands `.github/copilot-instructions.md` so
+  subsequent deployment issues see the new specs in the standing
+  required-reading list.
+- `#44` (Done — PR #52): Add `scripts/install.sh`, `scripts/lib.sh`,
+  and the `install`/`upgrade`/`uninstall`/`status` subcommands per
+  `design.md`.
+- `#45` (Done — PR #54): Replace `scripts/deploy_rpi_io_mcp.sh` with
   `scripts/remote-install.sh`. Deletes the legacy script in the same PR.
-  Blocked by `#44`.
-- `#46`: Add top-level `Makefile` exposing all targets per
-  `design.md::Makefile`. Blocked by `#44` and `#45`.
-- `#47`: Add `packaging/debian/` and `packaging/build-deb.sh`. Verifies
-  the drift-check between packaged and canonical units. Blocked by `#43`.
-- `#48`: Closeout — full acceptance run on a real Pi for both install
-  paths, then flip Status from Approved to Implemented. Blocked by `#43`,
-  `#44`, `#45`, `#46`, `#47` all merged.
+- `#46` (Done — PR #55): Add top-level `Makefile` exposing all targets
+  per `design.md::Makefile`.
+- `#47` (Done — PR #53): Add `packaging/debian/` and
+  `packaging/build-deb.sh`. Verifies the drift-check between packaged
+  and canonical units.
+- `#48` (Done — closeout): Full acceptance run on a real Pi for both
+  install paths. Twelve gates passed (A1–A6 + B1–B6); three Blocking
+  bugs surfaced during verification and were fixed in the closeout PR
+  (bundled-venv shebang relocation, wheel-aware default config path,
+  and lgpio runtime-dir + `LG_WD` in the systemd unit). Status flipped
+  from Approved to Implemented across all three deployment specs.
 
 Dependency graph:
 
@@ -162,10 +166,9 @@ requirement IDs, acceptance, verify command. See
 
 ## Remaining Decisions Before Code
 
-None. Owner approved `requirements.md`, `design.md`, and `tasks.md` on
-2026-05-01. Implementation issues `#43`–`#48` are open. The next gate is
-`#48` (real-Pi acceptance run), which flips the three deployment specs
-from Approved to Implemented.
+None. The feature is `Implemented`. See the deployment-spec
+"Decisions Discovered During Implementation" section in `design.md` for
+the closeout-time fixes that are now part of the canonical design.
 
 ## Change Log
 
@@ -177,3 +180,9 @@ from Approved to Implemented.
   clarified that `docs/deployment.md` references the script entrypoint
   until the Makefile lands in `#46`; "Remaining Decisions Before Code"
   rewritten now that approval has happened.
+- 2026-05-01: Closeout (`#48`). All five implementation issues closed
+  via PRs #51–#55. Closeout verified both install paths on a real Pi
+  (12/12 acceptance gates green; see `requirements.md` Change Log for
+  the per-gate summary). Per-task entries above updated with the
+  merged PR pointers and Done markers. Status flipped from Approved to
+  Implemented.

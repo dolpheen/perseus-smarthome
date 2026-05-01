@@ -89,7 +89,39 @@ You can also invoke the script directly when `make` is not available:
 ./scripts/remote-install.sh uninstall --purge
 ```
 
-### Option B — Manual steps
+### Option B — Debian package (`apt install`)
+
+The `.deb` is built on the Pi (armv7l) and bundles a self-contained venv,
+so installs are atomic and need no source build at install time. The
+service runs as a dedicated system user `perseus-smarthome` (created by
+`postinst`) instead of the deploy user — see
+`specs/features/deployment/design.md::Resolved Design Decisions::1`.
+
+Mixing the deb path and the script path on the same Pi is unsupported
+(both manage `/opt/raspberry-smarthome` and the same systemd unit); the
+preinst and `scripts/install.sh` refuse with a clear error if the other
+path's install is detected.
+
+```bash
+# On the Pi (or any armv7l host with a checkout):
+make deb                                  # produces dist/perseus-smarthome_<ver>_armhf.deb
+sudo apt install -y ./dist/perseus-smarthome_<ver>_armhf.deb
+
+# Subsequent management uses standard apt verbs:
+sudo apt remove perseus-smarthome         # stop service, remove unit; keep /opt/raspberry-smarthome
+sudo apt purge perseus-smarthome          # also remove install root and the perseus-smarthome user
+```
+
+`make deb-install`, `make deb-uninstall`, and `make deb-purge` are thin
+wrappers; `deb-install` resolves the latest built `.deb` so `dist/` may
+hold multiple versions safely.
+
+The build script reads the maintainer identity from `git config user.name`
+/ `git config user.email` (or a `DEB_MAINTAINER` env override), and
+checks the `Depends:` packages against the build host's apt index before
+packaging. `pyproject.toml`'s version drives the artifact name.
+
+### Option C — Manual steps
 
 ```bash
 # 1. Sync the project to the Pi
