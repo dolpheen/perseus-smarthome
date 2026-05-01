@@ -55,9 +55,11 @@ packaging/
     ├── control                        #   metadata, Depends:
     ├── changelog                      #   debian changelog
     ├── conffiles                      #   /opt/raspberry-smarthome/config/rpi-io.toml
+    ├── preinst                        #   refuse on top of script-managed install
     ├── postinst                       #   adduser system user, daemon-reload, enable --now
     ├── prerm                          #   stop, disable
-    └── postrm                         #   daemon-reload (remove); rm install root + user (purge)
+    ├── postrm                         #   daemon-reload (remove); rm install root + user (purge)
+    └── perseus-smarthome.service      #   packaged unit (User=perseus-smarthome); drift-checked against deploy/systemd/rpi-io-mcp.service at build time
 docs/
 └── deployment.md                      # MODIFIED: rewritten around the new flow
 ```
@@ -136,12 +138,19 @@ uninstall.
 
 Mitigations:
 
-- `scripts/install.sh install` checks for `dpkg -l perseus-smarthome` first
-  and refuses with a clear error pointing at `apt remove perseus-smarthome`
-  before reinstalling via the script.
-- The `.deb` `preinst` checks for a non-package-managed install at
-  `/opt/raspberry-smarthome` (presence of files not owned by dpkg) and
-  refuses with a clear error pointing at `make uninstall PURGE=1`.
+- `scripts/install.sh install` runs
+  `dpkg-query -W -f='${Status}' perseus-smarthome 2>/dev/null` and refuses
+  if the result starts with `install ok installed`, pointing the operator
+  at `apt remove perseus-smarthome` before reinstalling via the script.
+- The `.deb` `preinst` runs the same check in reverse: if
+  `/opt/raspberry-smarthome` exists but `dpkg-query -W -f='${Status}'
+  perseus-smarthome` does not return `install ok installed` (i.e. the
+  directory is owned by a script-managed install, not a current package),
+  it refuses with a clear error pointing at `make uninstall PURGE=1`.
+  Using the parsed `Status` field — not `dpkg-query -L`'s exit code —
+  avoids a false positive on a package in the
+  removed-but-not-purged (`rc`) state, where `-L` exits non-zero even
+  though dpkg still owns the conffiles.
 
 A future iteration may add a documented migration recipe; this iteration
 keeps the two paths strictly separate.
@@ -243,9 +252,10 @@ Read-only. Prints:
 - Version from `/opt/raspberry-smarthome/pyproject.toml::project.version`
   (parsed with awk; tolerates the file being missing).
 - Local reachability check:
-  `curl -sS -o /dev/null -w '%{http_code}\n' http://localhost:8000/mcp`
-  (the path must be a TCP-OK probe; HTTP code 405/406 from the MCP server
-  is treated as reachable).
+  `curl -sS -o /dev/null -w '%{http_code}\n' http://localhost:<port>/mcp`
+  where `<port>` is read from `config/rpi-io.toml::server.port`
+  (currently `8000`). The probe is a TCP-OK probe; HTTP code 405/406 from
+  the MCP server is treated as reachable.
 
 ### Helpers in `scripts/lib.sh`
 
@@ -293,7 +303,7 @@ Version: 0.1.0
 Section: misc
 Priority: optional
 Architecture: armhf
-Maintainer: Vadim <v392persei@gmail.com>
+Maintainer: <maintainer-name-and-email>
 Depends: liblgpio1, libffi8, adduser, systemd, libc6, python3 (>= 3.13)
 Description: Raspberry Pi I/O MCP Server
  Hardware-facing MCP server that exposes configured GPIO outputs and
@@ -301,6 +311,11 @@ Description: Raspberry Pi I/O MCP Server
  Python virtualenv at /opt/raspberry-smarthome/.venv so installs are
  self-contained.
 ```
+
+The `Maintainer:` field is filled in at build time by `build-deb.sh`,
+which reads it from `git config user.name`/`git config user.email` (or a
+`DEB_MAINTAINER` env override) on the build host. Keeping the placeholder
+here avoids embedding a personal address in the spec.
 
 Concrete `Depends:` versions are pinned during the first build run on a
 real Pi (where `apt-cache policy` is the source of truth). The values
@@ -321,11 +336,20 @@ So apt does not silently overwrite a Pi-local edit on upgrade.
 #!/bin/sh
 set -e
 # Refuse to install on top of a script-managed install.
-if [ -d /opt/raspberry-smarthome ] && \
-   ! dpkg-query -L perseus-smarthome >/dev/null 2>&1; then
-  echo "Found a non-package install at /opt/raspberry-smarthome." >&2
-  echo "Run 'sudo make uninstall PURGE=1' first, then retry." >&2
-  exit 1
+# `dpkg-query -W -f='${Status}'` parses dpkg's own state record, so it
+# returns `install ok installed` only for a currently-installed package
+# (not for `rc` removed-but-not-purged, which would falsely look like a
+# script-managed install if we used `dpkg-query -L`'s exit code instead).
+if [ -d /opt/raspberry-smarthome ]; then
+  pkg_status=$(dpkg-query -W -f='${Status}' perseus-smarthome 2>/dev/null || true)
+  case "$pkg_status" in
+    "install ok installed") : ;;
+    *)
+      echo "Found a non-package install at /opt/raspberry-smarthome." >&2
+      echo "Run 'sudo make uninstall PURGE=1' first, then retry." >&2
+      exit 1
+      ;;
+  esac
 fi
 ```
 
@@ -559,4 +583,13 @@ None blocking. Possible follow-ups for a later iteration:
   `deploy/systemd/`; cross-path coexistence: not supported, with refusal
   guards on both sides). Pending owner approval.
 - 2026-05-01: Owner approved. Status flipped from Draft to Approved.
-  Implementation begins under issues `#A`–`#F`.
+  Implementation begins under issues `#43`–`#48`.
+- 2026-05-01: Spec-PR review punch-list landed inline (no implementation
+  changes): preinst guard switched from `dpkg-query -L` to
+  `dpkg-query -W -f='${Status}'` so the `rc` (removed-not-purged) state
+  no longer falsely trips the script-vs-deb guard; File Layout now lists
+  the packaged `perseus-smarthome.service` and the `preinst` script;
+  Cross-Path Coexistence prose reconciled with the snippet; status-probe
+  port read from `config/rpi-io.toml::server.port`; `Maintainer:` field
+  in `control` made a build-time placeholder so personal contact details
+  do not live in the spec.

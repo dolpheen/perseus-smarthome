@@ -108,8 +108,12 @@ requirement IDs, acceptance, verify command. See
      and invokes `scripts/install.sh` on the Pi over SSH.
    - Delete `scripts/deploy_rpi_io_mcp.sh` in the same PR. The legacy
      script must not survive merge — two entrypoints will drift.
-   - Update `docs/deployment.md` Option A to reference `make
-     remote-install` and the new wrapper.
+   - Update `docs/deployment.md` Option A to reference
+     `./scripts/remote-install.sh install` (the script entrypoint), not
+     `make remote-install`. The Makefile and `make remote-install` land
+     in `#46` and `#46` itself promotes the docs to the `make` form;
+     this avoids `#45`'s docs pointing at a target that does not exist
+     on `main` until `#46` merges.
    - Verify from the Mac: `./scripts/remote-install.sh install` against a
      working Pi end-to-end.
    - Spec refs: `DEP-FR-012` through `DEP-FR-014`.
@@ -158,8 +162,10 @@ requirement IDs, acceptance, verify command. See
 
 ## Remaining Decisions Before Code
 
-None blocking. Owner approval of `requirements.md` and `design.md` is the
-only gate.
+None. Owner approved `requirements.md`, `design.md`, and `tasks.md` on
+2026-05-01. Implementation issues `#43`–`#48` are open. The next gate is
+`#48` (real-Pi acceptance run), which flips the three deployment specs
+from Approved to Implemented.
 
 ## Change Log
 
@@ -167,3 +173,7 @@ only gate.
   opened or implementation begins.
 - 2026-05-01: Owner approved. Status flipped from Draft to Approved.
   GitHub issues `#43`–`#48` opened.
+- 2026-05-01: Spec-PR review punch-list landed inline: task `#45`
+  clarified that `docs/deployment.md` references the script entrypoint
+  until the Makefile lands in `#46`; "Remaining Decisions Before Code"
+  rewritten now that approval has happened.

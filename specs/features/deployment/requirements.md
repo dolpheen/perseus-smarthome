@@ -5,8 +5,8 @@ Last reviewed: 2026-05-01
 Owner: Vadim  
 Parent spec: ../../project.spec.md  
 Related feature: ../rpi-io-mcp/requirements.md  
-Related code: ../../../scripts/deploy_rpi_io_mcp.sh; ../../../deploy/systemd/rpi-io-mcp.service; ../../../docs/deployment.md  
-Related tests: TBD
+Related code: ../../../scripts/install.sh (planned, `#44`); ../../../scripts/lib.sh (planned, `#44`); ../../../scripts/remote-install.sh (planned, `#45`, replaces `scripts/deploy_rpi_io_mcp.sh`); ../../../Makefile (planned, `#46`); ../../../packaging/build-deb.sh (planned, `#47`); ../../../packaging/debian/ (planned, `#47`); ../../../deploy/systemd/rpi-io-mcp.service (modified, `#43`); ../../../docs/deployment.md (modified across `#43`/`#45`/`#46`)  
+Related tests: ../../../tests/scripts/ (planned, `#44`); existing `tests/e2e/test_rpi_io_mcp.py` is the verification harness for both install paths under `#48` (no functional changes — re-run with `--run-hardware` against each freshly installed Pi)
 
 ## Summary
 
@@ -322,25 +322,31 @@ tool contract, the GPIO behavior, or the trusted-LAN security posture.
 
 ## Open Questions
 
-1. Service user model for the `.deb`: create a dedicated system user
-   `perseus-smarthome` in `postinst`, or reuse the existing `pi` /
-   `$DEPLOY_USER` model? Debian convention favors a dedicated system user;
-   the script-install path naturally uses the deploy user. Design must
-   either harmonize the two or accept the divergence.
-2. systemd unit `ExecStart` form: replace the current
-   `/home/<user>/.local/bin/uv run --no-dev rpi-io-mcp` with
-   `/opt/raspberry-smarthome/.venv/bin/rpi-io-mcp`. The latter removes the
-   dependency on `uv` at runtime and on a per-user `~/.local/bin` path,
-   which both install paths benefit from. Confirm this in design.
-3. Whether to keep `deploy/` and `scripts/` separate, or move the systemd
-   unit under `packaging/` to keep all install assets co-located. Design
-   must pick one.
-4. Cross-path coexistence policy: does the project officially support
-   switching from script-install to `.deb` (or back) on the same Pi, and
-   if so, what's the migration recipe?
+All four questions raised against the Draft were resolved in
+`design.md::Resolved Design Decisions` and are recorded here for
+traceability. They are no longer open.
 
-These do not block writing the design; they are decisions the design must
-resolve before tasks are split.
+1. **Resolved.** Service user model for the `.deb`: divergent by design.
+   Script path runs the service as the deploy user; `.deb` creates a
+   dedicated `perseus-smarthome` system user in `postinst`. Both are
+   added to the `gpio` group. Mixing the two paths on the same Pi is
+   explicitly unsupported. See `design.md::Resolved Design Decisions::1`
+   and `Cross-Path Coexistence`.
+2. **Resolved.** systemd `ExecStart` form: switched to
+   `/opt/raspberry-smarthome/.venv/bin/rpi-io-mcp`. Drops the runtime
+   `uv` dependency and the per-user `~/.local/bin` path. See
+   `design.md::Resolved Design Decisions::2`.
+3. **Resolved.** Unit location: canonical unit stays at
+   `deploy/systemd/rpi-io-mcp.service`. The `.deb` ships its own copy
+   under `packaging/debian/perseus-smarthome.service` and the build
+   script asserts the two are equal after `User=` substitution. See
+   `design.md::Resolved Design Decisions::3`.
+4. **Resolved.** Cross-path coexistence: not supported. Both install
+   paths refuse with a clear error (script-install via
+   `dpkg-query -W -f='${Status}'`; `.deb` `preinst` via the same check
+   in reverse) when the other path's install is detected. A documented
+   migration recipe is a possible follow-up but is out of scope for this
+   iteration. See `design.md::Resolved Design Decisions::4`.
 
 ## Change Log
 
@@ -352,4 +358,9 @@ resolve before tasks are split.
   owner approval before design is locked.
 - 2026-05-01: Owner approved requirements, design, and tasks. Status
   flipped from Draft to Approved. Implementation begins under issues
-  `#A`–`#F` per `tasks.md`.
+  `#43`–`#48` per `tasks.md`.
+- 2026-05-01: Spec-PR review punch-list landed inline: `Related code`
+  and `Related tests` headers populated with planned files (per-issue
+  attribution); `Open Questions` rewritten to record that all four
+  questions were resolved in `design.md`; `#A`–`#F` placeholders
+  replaced with the actual issue numbers `#43`–`#48`.
