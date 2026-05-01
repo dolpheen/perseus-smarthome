@@ -1,6 +1,6 @@
 # Raspberry Pi I/O MCP Server
 
-Status: Approved
+Status: Implemented
 Last reviewed: 2026-05-01  
 Owner: Vadim  
 Parent spec: ../../project.spec.md  
@@ -164,3 +164,4 @@ None for Milestone 1 implementation.
 - 2026-04-30: Set pytest as the project test runner.
 - 2026-04-30: Owner approved Milestone 1 requirements (issue `#1` closed). Status flipped to Approved.
 - 2026-05-01: Implementation landed across PRs #32 (#5), #35 (#6), #36 (#7), and #38 (#8). Related code and Related tests fields populated. Loopback wiring constraint (line 90) revised in PR #35 to permit a bare jumper alongside the preferred current-limiting resistor — the safety guarantee comes from the device-direction enforcement in `service.py` and the GPIO adapter, not from the wiring choice. Status remains Approved; flips to Implemented after Pi reboot persistence and Codex MCP smoke are verified per `tasks.md` task 10.
+- 2026-05-01: Closeout (issue #9) complete. All four acceptance gates green: automated MacBook E2E `--run-hardware` 12/12, manual multimeter smoke 5/5, Pi reboot persistence (systemd autostart with GPIO23 at safe-default 0), and Codex MCP smoke (fresh session called `rpi-io.list_devices` over streamable HTTP and received both configured devices). Status flipped from Approved to Implemented.
