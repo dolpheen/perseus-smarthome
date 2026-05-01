@@ -15,7 +15,8 @@
 #   RPI_SSH_KEY_PATH — path to SSH private key, or leave blank to use ssh-agent
 #
 # For install/upgrade: rsyncs the working tree to /opt/raspberry-smarthome on
-# the Pi, then SSHs and runs scripts/install.sh <subcommand> --user <user>.
+# the Pi, then SSHs and runs scripts/install.sh <subcommand>; --user is only
+# passed for install (upgrade reads the deploy user from the installed unit).
 # For uninstall/status: SSH only — no rsync needed.
 
 set -euo pipefail
@@ -82,23 +83,38 @@ if [[ "${SUBCOMMAND}" == "install" || "${SUBCOMMAND}" == "upgrade" ]]; then
   )
 
   echo "==> Syncing project to ${SSH_TARGET}:${REMOTE_DIR}"
-  # Ensure the remote directory exists and is owned by the deploy user
+  # Ensure the remote directory exists and is owned by the deploy user.
+  # Use -R so that root-owned files from a previous install are also reclassified
+  # before rsync writes new files under the same tree.
   ssh "${SSH_OPTS[@]}" "${SSH_TARGET}" \
-    "sudo mkdir -p '${REMOTE_DIR}' && sudo chown '${RPI_SSH_USER}:gpio' '${REMOTE_DIR}'"
+    "sudo mkdir -p '${REMOTE_DIR}' && sudo chown -R '${RPI_SSH_USER}:gpio' '${REMOTE_DIR}'"
 
   rsync "${RSYNC_OPTS[@]}" "${REPO_ROOT}/" "${SSH_TARGET}:${REMOTE_DIR}/"
 
   echo "==> Running install.sh ${SUBCOMMAND} on Pi"
-  ssh "${SSH_OPTS[@]}" "${SSH_TARGET}" \
-    "sudo /opt/raspberry-smarthome/scripts/install.sh '${SUBCOMMAND}' --user '${RPI_SSH_USER}'"
+  if [[ "${SUBCOMMAND}" == "install" ]]; then
+    # Pass --user only for install; upgrade reads the deploy user from the
+    # already-installed systemd unit and ignores --user.
+    ssh -t "${SSH_OPTS[@]}" "${SSH_TARGET}" \
+      "sudo /opt/raspberry-smarthome/scripts/install.sh '${SUBCOMMAND}' --user '${RPI_SSH_USER}'"
+  else
+    ssh -t "${SSH_OPTS[@]}" "${SSH_TARGET}" \
+      "sudo /opt/raspberry-smarthome/scripts/install.sh '${SUBCOMMAND}'"
+  fi
 else
   # uninstall / status — SSH only, no rsync.
   echo "==> Running install.sh ${SUBCOMMAND} on Pi"
-  REMOTE_CMD="sudo /opt/raspberry-smarthome/scripts/install.sh '${SUBCOMMAND}'"
-  if [[ ${#EXTRA_ARGS[@]} -gt 0 ]]; then
-    for _extra in "${EXTRA_ARGS[@]}"; do
-      REMOTE_CMD+=" $(printf '%q' "${_extra}")"
-    done
+  if [[ "${SUBCOMMAND}" == "status" ]]; then
+    # status is read-only; no sudo needed.
+    ssh -t "${SSH_OPTS[@]}" "${SSH_TARGET}" \
+      "/opt/raspberry-smarthome/scripts/install.sh '${SUBCOMMAND}'"
+  else
+    REMOTE_CMD="sudo /opt/raspberry-smarthome/scripts/install.sh '${SUBCOMMAND}'"
+    if [[ ${#EXTRA_ARGS[@]} -gt 0 ]]; then
+      for _extra in "${EXTRA_ARGS[@]}"; do
+        REMOTE_CMD+=" $(printf '%q' "${_extra}")"
+      done
+    fi
+    ssh -t "${SSH_OPTS[@]}" "${SSH_TARGET}" "${REMOTE_CMD}"
   fi
-  ssh "${SSH_OPTS[@]}" "${SSH_TARGET}" "${REMOTE_CMD}"
 fi

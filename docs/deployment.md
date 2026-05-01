@@ -72,7 +72,7 @@ Supported subcommands:
 ./scripts/remote-install.sh install          # first install
 ./scripts/remote-install.sh upgrade          # re-sync and restart after code changes
 ./scripts/remote-install.sh status           # print service status
-./scripts/remote-install.sh uninstall        # stop and remove service + venv
+./scripts/remote-install.sh uninstall        # stop/disable service and remove systemd unit
 ./scripts/remote-install.sh uninstall --purge  # also removes /opt/raspberry-smarthome
 ```
 
