@@ -37,7 +37,7 @@ Workflow:
 3. Fetch each issue's `databaseId` (the REST endpoint takes the database ID, not the issue number):
 
    ```bash
-   gh api graphql -f query='query { repository(owner:"<o>",name:"<r>") { issue(number:N) { databaseId } } }'
+   gh api graphql -f query='query { repository(owner:"<o>",name:"<r>") { issue(number:<N>) { databaseId } } }'
    ```
 
 4. Add each direct blocked-by edge:
