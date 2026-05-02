@@ -134,6 +134,25 @@ def test_list_devices_tool_devices_have_state_field() -> None:
         assert "state" in device
 
 
+def test_list_devices_tool_returns_rate_limit_default() -> None:
+    """list_devices includes rate_limit.output_min_interval_ms = 250 when unset."""
+    mcp, _ = _make_mcp()
+    result = _call(mcp, "list_devices")
+    assert "rate_limit" in result
+    assert result["rate_limit"]["output_min_interval_ms"] == 250
+
+
+def test_list_devices_tool_returns_configured_rate_limit() -> None:
+    """list_devices reflects a configured rate_limit value."""
+    config = load_config()
+    registry = build_registry(config)
+    adapter = MockGPIOAdapter()
+    service = GPIOService(registry, adapter, rate_limit_ms=500)
+    mcp = create_server(service)
+    result = _call(mcp, "list_devices")
+    assert result["rate_limit"]["output_min_interval_ms"] == 500
+
+
 # ---------------------------------------------------------------------------
 # set_output tool – success
 # ---------------------------------------------------------------------------

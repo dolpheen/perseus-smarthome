@@ -68,7 +68,7 @@ def main() -> None:
     # GPIO23 low before the process exits (design.md Safety Rules, FR-015).
     signal.signal(signal.SIGTERM, lambda *_: sys.exit(0))
 
-    from perseus_smarthome.config import load_config
+    from perseus_smarthome.config import load_config, get_rate_limit_ms
     from perseus_smarthome.devices import build_registry
     from perseus_smarthome.gpio import GPIOZeroAdapter
 
@@ -81,7 +81,7 @@ def main() -> None:
         config = load_config()
         registry = build_registry(config)
         adapter = GPIOZeroAdapter()
-        service = GPIOService(registry, adapter)
+        service = GPIOService(registry, adapter, rate_limit_ms=get_rate_limit_ms(config))
         mcp = create_server(service)
         mcp.run(transport="streamable-http")
     finally:

@@ -19,3 +19,10 @@ name = "GPIO24 Input"
 kind = "input"
 pin = 24
 pull = "down"
+
+# Optional: override the global output rate-limit (default 250 ms).
+# The agent reads this field from list_devices so it does not need
+# to parse this file directly.
+#
+# [rate_limit]
+# output_min_interval_ms = 250

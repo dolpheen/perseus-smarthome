@@ -64,6 +64,7 @@ The canonical first test configuration uses BCM numbering, GPIO23 as the output 
 - IO-MCP-FR-014: The server must expose streamable HTTP MCP over the trusted LAN for first milestone testing.
 - IO-MCP-FR-015: The systemd service must reset GPIO23 to low/off when the service starts after restart or reboot.
 - IO-MCP-FR-016: The project must provide a MacBook-side discovery tool that can find candidate Raspberry Pi hosts on the LAN when the device is headless and only SSH is open.
+- IO-MCP-FR-017: The `list_devices` MCP tool must include a top-level `rate_limit` object with an `output_min_interval_ms` integer field. When the optional `[rate_limit]` table is absent from `config/rpi-io.toml`, the field defaults to `250`. Pre-existing clients that ignore this field continue to work without change.
 
 ## Acceptance Criteria
 
@@ -165,3 +166,4 @@ None for Milestone 1 implementation.
 - 2026-04-30: Owner approved Milestone 1 requirements (issue `#1` closed). Status flipped to Approved.
 - 2026-05-01: Implementation landed across PRs #32 (#5), #35 (#6), #36 (#7), and #38 (#8). Related code and Related tests fields populated. Loopback wiring constraint (line 90) revised in PR #35 to permit a bare jumper alongside the preferred current-limiting resistor — the safety guarantee comes from the device-direction enforcement in `service.py` and the GPIO adapter, not from the wiring choice. Status remains Approved; flips to Implemented after Pi reboot persistence and Codex MCP smoke are verified per `tasks.md` task 10.
 - 2026-05-01: Closeout (issue `#9`) complete. All four acceptance gates green: automated MacBook E2E `--run-hardware` 12/12, manual multimeter smoke 5/5, Pi reboot persistence (systemd autostart with GPIO23 at safe-default 0), and Codex MCP smoke (fresh session called `rpi-io.list_devices` over streamable HTTP and received both configured devices). Status flipped from Approved to Implemented.
+- 2026-05-02: Additive change — IO-MCP-FR-017 added (LLM-A-2). `list_devices` now returns a top-level `rate_limit.output_min_interval_ms` field (default 250 ms, configurable via optional `[rate_limit]` table in `config/rpi-io.toml`). Pre-existing clients that ignore the new field are unaffected.

@@ -16,9 +16,15 @@ from perseus_smarthome.gpio import GPIOAdapter, GPIOError
 class GPIOService:
     """Service layer that mediates between MCP tools and the GPIO adapter."""
 
-    def __init__(self, registry: DeviceRegistry, adapter: GPIOAdapter) -> None:
+    def __init__(
+        self,
+        registry: DeviceRegistry,
+        adapter: GPIOAdapter,
+        rate_limit_ms: int = 250,
+    ) -> None:
         self._registry = registry
         self._adapter = adapter
+        self._rate_limit_ms = rate_limit_ms
         try:
             self._init_pins()
         except GPIOError:
@@ -59,7 +65,10 @@ class GPIOService:
                     "state": device.state,
                 }
             )
-        return {"devices": devices}
+        return {
+            "devices": devices,
+            "rate_limit": {"output_min_interval_ms": self._rate_limit_ms},
+        }
 
     def set_output(self, device_id: str, value: int) -> dict[str, Any]:
         """Set an allowed output device to 0 or 1.
