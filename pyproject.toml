@@ -21,6 +21,20 @@ dependencies = [
 # library. Run before `uv sync` on the Pi:
 #   sudo apt install -y libffi-dev python3-dev build-essential
 
+[project.optional-dependencies]
+# LLM agent layer (Milestone 2 / Phase A): deepagents pulls langchain +
+# langgraph transitively; langchain-openai resolves init_chat_model with
+# model_provider="openai"; websockets provides the WebSocket server for
+# the agent chat endpoint.
+# Install on dev machines / agent hosts with: uv sync --extra agent
+# The Pi's rpi-io-mcp path (uv sync --no-dev) does NOT install these,
+# keeping the armv7l install free of tiktoken's Rust build dep.
+agent = [
+  "deepagents>=0.5.6",
+  "langchain-openai>=1.2.1",
+  "websockets>=16.0",
+]
+
 [project.scripts]
 rpi-io-mcp = "perseus_smarthome.server:main"
 
@@ -38,4 +52,5 @@ testpaths = ["tests"]
 markers = [
   "e2e: tests that require a reachable Raspberry Pi MCP server",
   "hardware: tests that require Raspberry Pi GPIO wiring",
+  "llm: tests that call the real LLM provider (pass --run-llm to opt in)",
 ]
