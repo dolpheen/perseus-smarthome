@@ -147,14 +147,62 @@ jobs:
             fi
           done
 
-          # Gate on unresolved copilot-pull-request-reviewer[bot] inline
-          # review threads. Copilot's reviewer surfaces real defects outside
-          # normal pytest coverage (e.g. PR #36's WorkingDirectory mismatch);
-          # leaving its comments unaddressed at merge time silently buries
-          # that signal. Block until every Copilot thread on the PR is marked
-          # Resolved by a maintainer.
+          # Gate on Copilot reviewer state. Three distinct conditions block
+          # the merge:
+          #   1. A pending review request to copilot-pull-request-reviewer.
+          #      Without this, the gate can fire in the ~8s ready→merge
+          #      window before Copilot (which takes ~30s to start) produces
+          #      any threads — observed on PR #93, where merge happened 19s
+          #      before Copilot's reviewer started.
+          #   2. Copilot's latest review state is CHANGES_REQUESTED. Threads
+          #      usually accompany a CHANGES_REQUESTED review and would trip
+          #      the unresolved-thread check below, but a body-only review
+          #      would otherwise slip through.
+          #   3. Unresolved Copilot inline review threads (the original
+          #      condition; Copilot's reviewer surfaces real defects outside
+          #      normal pytest coverage, e.g. PR #36's WorkingDirectory
+          #      mismatch).
           # Fail-closed on every error path: GraphQL failure, paginated
           # overflow beyond first:100 threads, or any malformed payload.
+          if ! copilot_review_json=$(gh api graphql -f query="
+            query { repository(owner:\"$owner\", name:\"$name\") {
+              pullRequest(number:$PR_NUMBER) {
+                reviewRequests(first:20) {
+                  nodes { requestedReviewer {
+                    __typename
+                    ... on Bot { login }
+                    ... on User { login }
+                  } }
+                }
+                latestReviews(first:50) {
+                  nodes { author { login } state }
+                }
+              }
+            }}"); then
+            echo "GraphQL call for Copilot reviewer state failed; failing closed"
+            echo "merge=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          copilot_pending=$(jq '
+            [.data.repository.pullRequest.reviewRequests.nodes[]
+             | select((.requestedReviewer.login // "") == "copilot-pull-request-reviewer")
+            ] | length' <<<"$copilot_review_json")
+          if [[ "$copilot_pending" -gt 0 ]]; then
+            echo "Copilot review request is still pending; not merging"
+            echo "merge=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          copilot_changes=$(jq '
+            [.data.repository.pullRequest.latestReviews.nodes[]
+             | select((.author.login // "") == "copilot-pull-request-reviewer")
+             | select(.state == "CHANGES_REQUESTED")
+            ] | length' <<<"$copilot_review_json")
+          if [[ "$copilot_changes" -gt 0 ]]; then
+            echo "Copilot has CHANGES_REQUESTED on the PR; not merging"
+            echo "merge=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
           if ! threads_json=$(gh api graphql -f query="
             query { repository(owner:\"$owner\", name:\"$name\") {
               pullRequest(number:$PR_NUMBER) {
