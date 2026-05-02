@@ -49,6 +49,10 @@ without runtime templating of paths).
 - SSH access to the Pi configured via `~/.ssh/config` or key path in `.env`.
 - `rsync` available (`brew install rsync` if needed).
 - A local `.env` file with Raspberry Pi connection details (see `.env.example`).
+  For Milestone 2 the same file also carries the LLM agent secret
+  (`LLM_API_KEY`, `LLM_API_BASE_URL`, `LLM_MODEL`); see
+  [LLM Agent Secrets](#llm-agent-secrets) below for how `make remote-install`
+  filters and deploys those keys.
 
 ## First Install
 
@@ -172,6 +176,84 @@ cd /opt/raspberry-smarthome
 git pull  # or rsync from MacBook
 uv sync --no-dev
 sudo systemctl restart rpi-io-mcp.service
+```
+
+## LLM Agent Secrets
+
+The agent service (`rpi-io-agent.service`) reads its OpenRouter / OpenAI-compatible
+credentials from `/etc/perseus-smarthome/agent.env` on the Pi. The file must be
+mode `0600` and owned by `root:root` — the unit's `EnvironmentFile=-` prefix
+means the service still starts when the file is missing and surfaces
+`error/code=llm_unconfigured` on the first chat turn.
+
+Recognized keys (set in the operator's local `.env` on the MacBook):
+
+```dotenv
+LLM_API_KEY=sk-or-v1-...
+LLM_API_BASE_URL=https://openrouter.ai/api/v1
+LLM_MODEL=tencent/hy3-preview:free
+```
+
+Only keys whose name starts with `LLM_` are deployed to the Pi. `RPI_*` and
+`AGENT_*` variables stay on the operator machine; the deploy refuses to ship
+them.
+
+### Script path (`make remote-install`)
+
+`scripts/remote-install.sh` greps `^LLM_[A-Z0-9_]+=` lines from the local
+`.env`, opens an SSH session to the Pi, creates `/etc/perseus-smarthome/`
+(mode `0755`, root) if missing, pre-creates `agent.env` with mode `0600`
+owner `root:root` via `install -m 0600 -o root -g root /dev/null`, then pipes
+the filtered content over SSH to `sudo tee` so the value never touches the
+operator's user-readable shell history. Re-running `make remote-install`
+overwrites the file deterministically (no append, no merge).
+
+The deploy step runs after `rsync` and before `scripts/install.sh` is invoked
+on the Pi, so the agent service picks up the env on its first `enable --now`
+without needing a follow-up restart.
+
+### Deb path (manual operator step)
+
+The `.deb` cannot ship the secret. After `apt install`, create the file by
+hand:
+
+```bash
+sudo install -d -m 0755 -o root -g root /etc/perseus-smarthome
+sudo install -m 0600 -o root -g root /dev/null /etc/perseus-smarthome/agent.env
+sudo tee /etc/perseus-smarthome/agent.env >/dev/null <<'EOF'
+LLM_API_KEY=sk-or-v1-...
+LLM_API_BASE_URL=https://openrouter.ai/api/v1
+LLM_MODEL=tencent/hy3-preview:free
+EOF
+sudo systemctl restart rpi-io-agent.service
+```
+
+`apt purge perseus-smarthome` removes `/etc/perseus-smarthome/` (including
+`agent.env`); `apt remove` keeps it.
+
+### Verifying the file
+
+```bash
+ssh "$RPI_SSH_USER@$RPI_SSH_HOST" 'sudo stat -c "%a %U %G" /etc/perseus-smarthome/agent.env'
+# expect: 600 root root
+
+ssh "$RPI_SSH_USER@$RPI_SSH_HOST" 'sudo grep -c "^RPI_" /etc/perseus-smarthome/agent.env'
+# expect: 0
+
+ssh "$RPI_SSH_USER@$RPI_SSH_HOST" 'sudo grep -c "^LLM_" /etc/perseus-smarthome/agent.env'
+# expect: at least 1
+```
+
+The agent must never log the `LLM_API_KEY` value. Verify by piping remote
+journal output through a local grep (the key stays on the operator machine
+and never appears in `ps`-visible SSH command-lines or remote shell history):
+
+```bash
+LLM_KEY="$(grep ^LLM_API_KEY= .env | cut -d= -f2-)"
+ssh "$RPI_SSH_USER@$RPI_SSH_HOST" \
+    "sudo journalctl -u rpi-io-agent.service --since '5 min ago'" \
+  | grep -Fc -- "$LLM_KEY"
+# expect: 0
 ```
 
 ## Service Management

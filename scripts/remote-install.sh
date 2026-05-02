@@ -62,6 +62,31 @@ if [[ -n "${RPI_SSH_KEY_PATH:-}" ]]; then
 fi
 SSH_TARGET="${RPI_SSH_USER}@${RPI_SSH_HOST}"
 
+# deploy_agent_env: filter LLM_* lines from local .env and write the result to
+# /etc/perseus-smarthome/agent.env on the Pi as root:root mode 0600.
+# Re-runs overwrite the file deterministically. RPI_* and AGENT_* variables
+# stay on the operator machine and are never written to the on-Pi file.
+deploy_agent_env() {
+  local env_path="${REPO_ROOT}/.env"
+  if [[ ! -f "${env_path}" ]]; then
+    echo "==> Skipping agent.env deployment: ${env_path} not present"
+    return 0
+  fi
+
+  local filtered
+  filtered="$(grep -E '^LLM_[A-Z0-9_]+=' "${env_path}" || true)"
+  if [[ -z "${filtered}" ]]; then
+    echo "==> Skipping agent.env deployment: no LLM_* keys in ${env_path}"
+    return 0
+  fi
+
+  echo "==> Deploying /etc/perseus-smarthome/agent.env (LLM_* keys, 0600 root:root)"
+  printf '%s\n' "${filtered}" | ssh "${SSH_OPTS[@]}" "${SSH_TARGET}" \
+    "sudo install -d -m 0755 -o root -g root /etc/perseus-smarthome && \
+     sudo install -m 0600 -o root -g root /dev/null /etc/perseus-smarthome/agent.env && \
+     sudo tee /etc/perseus-smarthome/agent.env >/dev/null"
+}
+
 # For install/upgrade: rsync working tree to the Pi, then invoke install.sh.
 if [[ "${SUBCOMMAND}" == "install" || "${SUBCOMMAND}" == "upgrade" ]]; then
   # Build the rsync remote-shell command with properly shell-quoted SSH options
@@ -89,6 +114,10 @@ if [[ "${SUBCOMMAND}" == "install" || "${SUBCOMMAND}" == "upgrade" ]]; then
     "sudo mkdir -p '${REMOTE_DIR}' && sudo chown -R '${RPI_SSH_USER}:gpio' '${REMOTE_DIR}'"
 
   rsync "${RSYNC_OPTS[@]}" "${REPO_ROOT}/" "${SSH_TARGET}:${REMOTE_DIR}/"
+
+  # Deploy LLM_* secrets before install.sh enables/restarts rpi-io-agent.service
+  # so the unit picks up the env on first start.
+  deploy_agent_env
 
   echo "==> Running install.sh ${SUBCOMMAND} on Pi"
   ssh -t "${SSH_OPTS[@]}" "${SSH_TARGET}" \
