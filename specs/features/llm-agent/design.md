@@ -1,7 +1,7 @@
 # LLM Agent Layer Design
 
 Status: Approved
-Last reviewed: 2026-05-02
+Last reviewed: 2026-05-03
 Owner: Vadim
 Requirements: requirements.md
 
@@ -237,13 +237,22 @@ frames as collapsed lines so the operator can audit what was invoked.
 New `.env.example` keys:
 
 ```text
-LLM_API_KEY          # OpenRouter API key (or any compatible provider key)
+OPENROUTER_API_KEY   # OpenRouter key for the default provider route
+OPENAI_API_KEY       # OpenAI-compatible key; accepted for OpenRouter too
+ANTHROPIC_API_KEY    # optional native Anthropic key for future/provider swaps
+LANGSMITH_*          # optional LangSmith tracing keys
 LLM_API_BASE_URL     # default https://openrouter.ai/api/v1
 LLM_MODEL            # default tencent/hy3-preview:free
 AGENT_CHAT_HOST      # default 0.0.0.0
 AGENT_CHAT_PORT      # default 8765
 AGENT_RPI_MCP_URL    # default http://127.0.0.1:8000/mcp
 ```
+
+`LLM_API_KEY` is accepted as a deprecated fallback alias for existing
+operator `.env` files. For the default OpenRouter route, the factory
+uses `OPENROUTER_API_KEY` first, then `OPENAI_API_KEY`, then legacy
+`LLM_API_KEY`. New OpenAI-compatible non-OpenRouter endpoints should use
+`OPENAI_API_KEY`, matching LangChain / Deep Agents conventions.
 
 ## Agent Construction
 
@@ -275,7 +284,7 @@ model = init_chat_model(
     model=os.environ["LLM_MODEL"],          # tencent/hy3-preview:free
     model_provider="openai",                # OpenAI Chat Completions schema
     base_url=os.environ["LLM_API_BASE_URL"],# https://openrouter.ai/api/v1
-    api_key=os.environ["LLM_API_KEY"],
+    api_key=os.environ["OPENROUTER_API_KEY"], # or OPENAI/legacy fallback
 )
 
 agent = create_deep_agent(
@@ -290,12 +299,15 @@ agent = create_deep_agent(
 )
 ```
 
-Provider swap: change `LLM_API_BASE_URL` and `LLM_MODEL` (and the
-matching key) in `.env`. `model_provider="openai"` stays the same for
+Provider swap: change `LLM_API_BASE_URL` and `LLM_MODEL` (and
+`OPENROUTER_API_KEY` / `OPENAI_API_KEY` for the OpenAI-compatible route)
+in `.env`.
+`model_provider="openai"` stays the same for
 any OpenAI-Chat-Completions-compatible endpoint (OpenRouter, OpenAI
 proper, a local vLLM/SGLang server, etc.). For non-OpenAI-compatible
 providers (e.g. native Anthropic) the swap is one extra line: change
-`model_provider` and drop `base_url`.
+`model_provider`, drop `base_url`, and use that provider's standard key
+such as `ANTHROPIC_API_KEY`.
 
 A `LLM_PROVIDER` env key is intentionally not added — `init_chat_model`
 already takes `model_provider` as a Python argument; introducing a
@@ -315,11 +327,12 @@ plain-language summaries inside `agent_turn` frames. Reused/added codes:
 
 - `llm_unreachable` — provider HTTPS error or timeout.
 - `llm_unauthorized` — provider rejected the API key.
-- `llm_unconfigured` — `LLM_API_KEY` is unset or empty at the time
-  the operator sends a turn. The chat service comes up in degraded
-  mode, accepts WebSocket connections, and surfaces this code on
-  the first turn rather than failing to start. `requirements.md`
-  Verification covers the boot path.
+- `llm_unconfigured` — `OPENROUTER_API_KEY` and `OPENAI_API_KEY` are
+  unset or empty at the time the operator sends a turn, and no legacy
+  `LLM_API_KEY` fallback is present. The chat service comes up in degraded mode, accepts
+  WebSocket connections, and surfaces this code on the first turn
+  rather than failing to start. `requirements.md` Verification covers
+  the boot path.
 - `mcp_unreachable` — `rpi-io-mcp` not responding.
 - `mcp_error` — MCP returned a structured error; original code
   forwarded in `details`.
@@ -331,9 +344,10 @@ plain-language summaries inside `agent_turn` frames. Reused/added codes:
 - `unconfigured_pin` — operator referenced a pin not in
   `config/rpi-io.toml`.
 
-No code path may include the `LLM_API_KEY` value in any error message
-or log line. Tool-call frames must not embed the key in headers or
-debug payloads.
+No code path may include the `OPENROUTER_API_KEY`, `OPENAI_API_KEY`,
+`ANTHROPIC_API_KEY`, `LANGSMITH_API_KEY`, or legacy `LLM_API_KEY` value
+in any error message or log line. Tool-call frames must not embed these
+keys in headers or debug payloads.
 
 `tool_call` frames echo argument dictionaries to the chat client by
 default. Phase A tools take only device IDs and integer values so
@@ -424,11 +438,14 @@ Milestone 1's `--run-hardware`) so CI does not need a provider key.
   works.
 - **Secret deployment from MacBook (script path):**
   `scripts/remote-install.sh` is extended to read the local
-  `.env` (gitignored, repo root), filter only `LLM_*` keys, and
-  scp them to the Pi at `/etc/perseus-smarthome/agent.env` with
-  `chmod 600` and owner `root`. `RPI_*` keys are explicitly
-  excluded; they have no business sitting on the Pi. Re-running
-  `make remote-install` overwrites the file idempotently.
+  `.env` (gitignored, repo root), filter only approved
+  agent-runtime keys (`OPENROUTER_API_KEY`, `OPENAI_API_KEY`,
+  `ANTHROPIC_API_KEY`, `LANGSMITH_*`, `LLM_MODEL`, `LLM_API_BASE_URL`, and legacy
+  `LLM_API_KEY`), and scp them to the Pi at
+  `/etc/perseus-smarthome/agent.env` with `chmod 600` and owner
+  `root`. `RPI_*` keys are explicitly excluded; they have no
+  business sitting on the Pi. Re-running `make remote-install`
+  overwrites the file idempotently.
 - **Secret deployment (deb path):** the package cannot ship the
   secret. Operator manually creates
   `/etc/perseus-smarthome/agent.env` after `apt install` per the
@@ -439,7 +456,7 @@ Milestone 1's `--run-hardware`) so CI does not need a provider key.
 - `make remote-install` and the deb path both extended to install
   the new unit alongside the existing one.
 - `docs/deployment.md` updated with the new `.env` keys (in the
-  repo-root `.env`), the `LLM_*` filtering behavior of
+  repo-root `.env`), the approved agent-key filtering behavior of
   `remote-install.sh`, the deb-path manual step, and a note that
   the on-Pi env file must remain `chmod 600` owner `root`.
 
@@ -484,11 +501,13 @@ Owner-approved 2026-05-02:
   is closed with `error/code=session_superseded` when a new
   connection takes the session. Drops the earlier
   `session_in_use` rejection.
-- **Service boot with missing `LLM_API_KEY`.** Service starts in
+- **Service boot with missing provider key.** Service starts in
   degraded mode (does not exit non-zero, does not flap under
-  systemd `Restart=on-failure`). WebSocket connections succeed.
-  The first operator turn returns `llm_unconfigured` so the
-  configuration problem is visible without revealing the key.
+  systemd `Restart=on-failure`) when `OPENROUTER_API_KEY` /
+  `OPENAI_API_KEY` are absent and no legacy `LLM_API_KEY` fallback is
+  present. WebSocket connections succeed. The first operator turn
+  returns `llm_unconfigured` so the configuration problem is visible
+  without revealing the key.
 
 ## Open Design Decisions
 
@@ -556,10 +575,12 @@ None. All design decisions are resolved.
   deployment spec, reversing its "divergent by design" decision).
   Multi-session policy switched to most-recent-wins with
   `session_superseded`; `session_in_use` is dropped from the error
-  model. `LLM_*` keys live in the same root `.env` and
-  `scripts/remote-install.sh` filters and copies them to
+  model. The then-current `LLM_*` key set lived in the same root `.env`
+  and `scripts/remote-install.sh` filtered and copied it to
   `/etc/perseus-smarthome/agent.env` (mode `0600`, owner `root`)
-  on the Pi; deb-path operators create the file by hand.
+  on the Pi; deb-path operators create the file by hand. This env-key
+  shape was superseded by the 2026-05-03 LangChain / OpenRouter sync
+  entry below.
   `EnvironmentFile=-` lets the service start in degraded mode when
   the secret is missing; `llm_unconfigured` surfaces on the first
   turn. Stale "see Open Question #6" reference removed. Added
@@ -582,3 +603,9 @@ None. All design decisions are resolved.
   inheritance caveat under Residual Risks.
 - 2026-05-02: Owner approved. Status flipped from Draft to
   Approved.
+- 2026-05-03: Env contract synchronized with LangChain / Deep Agents
+  conventions. `OPENROUTER_API_KEY` is the explicit default-route
+  credential; `OPENAI_API_KEY` remains accepted for OpenAI-compatible
+  endpoints. `ANTHROPIC_API_KEY` and `LANGSMITH_*` are documented as
+  approved agent-runtime keys. `LLM_API_KEY` remains a deprecated
+  fallback. Deployment filtering and examples were updated to match.

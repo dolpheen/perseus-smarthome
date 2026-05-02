@@ -8,7 +8,7 @@ Type=simple
 User=perseus-smarthome
 Group=perseus-smarthome
 WorkingDirectory=/opt/raspberry-smarthome
-# Agent reads LLM_API_KEY and chat listen address from agent.env.
+# Agent reads provider keys and chat listen address from agent.env.
 # The leading '-' means the unit starts in degraded mode if the file is
 # missing — llm_unconfigured is surfaced on the first WebSocket turn.
 EnvironmentFile=-/etc/perseus-smarthome/agent.env

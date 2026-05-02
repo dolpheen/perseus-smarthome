@@ -1,7 +1,7 @@
 # Deployment Optimization Design
 
 Status: Implemented
-Last reviewed: 2026-05-01  
+Last reviewed: 2026-05-03
 Owner: Vadim  
 Requirements: requirements.md
 
@@ -287,8 +287,11 @@ Mac-side. Reads `.env`. Subcommands match `install.sh`:
 
 Steps:
 
-1. Source `.env`. Default `RPI_SSH_*` values match the existing
-   `deploy_rpi_io_mcp.sh`.
+1. Parse `.env` for the `RPI_SSH_*` values needed by the wrapper.
+   Default `RPI_SSH_*` values match the existing `deploy_rpi_io_mcp.sh`.
+   The parser accepts ordinary dotenv assignment syntax and ignores
+   unrelated agent/provider keys, so a LangChain-style operator `.env`
+   cannot break deployment just because it contains non-`RPI_*` values.
 2. Build the SSH option array exactly as the existing deploy script does
    (port, optional key, `StrictHostKeyChecking=accept-new`).
 3. For `install`/`upgrade`: rsync the working tree to
@@ -747,3 +750,8 @@ None blocking. Possible follow-ups for a later iteration:
   step 7 is dropped; the canonical unit permanently carries
   `User=perseus-smarthome`. The `--user` flag on `install` is a no-op;
   `remote-install.sh` no longer passes it.
+- 2026-05-03: Remote wrapper env handling amended for the LLM agent env
+  sync. `scripts/remote-install.sh` parses only the `RPI_SSH_*` values it
+  needs instead of sourcing the entire operator `.env`, so LangChain /
+  Deep Agents keys can coexist in the same file without affecting SSH
+  setup.

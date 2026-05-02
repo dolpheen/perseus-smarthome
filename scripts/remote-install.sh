@@ -42,17 +42,52 @@ case "${SUBCOMMAND}" in
     ;;
 esac
 
-# Load .env if present
-if [[ -f "${REPO_ROOT}/.env" ]]; then
-  set -o allexport
-  # shellcheck source=/dev/null
-  source "${REPO_ROOT}/.env"
-  set +o allexport
-fi
+trim_env_value() {
+  local value="$1"
+  value="${value#"${value%%[![:space:]]*}"}"
+  value="${value%"${value##*[![:space:]]}"}"
+  if [[ "${value}" == \"*\" && "${value}" == *\" ]]; then
+    value="${value:1:${#value}-2}"
+  elif [[ "${value}" == \'*\' && "${value}" == *\' ]]; then
+    value="${value:1:${#value}-2}"
+  fi
+  printf '%s' "${value}"
+}
+
+read_env_value() {
+  local key="$1"
+  local env_path="${REPO_ROOT}/.env"
+  local line value
+
+  [[ -f "${env_path}" ]] || return 1
+
+  while IFS= read -r line || [[ -n "${line}" ]]; do
+    line="${line%$'\r'}"
+    [[ "${line}" =~ ^[[:space:]]*($|#) ]] && continue
+    if [[ "${line}" =~ ^[[:space:]]*export[[:space:]]+(.+)$ ]]; then
+      line="${BASH_REMATCH[1]}"
+    fi
+    if [[ "${line}" =~ ^[[:space:]]*${key}[[:space:]]*= ]]; then
+      value="${line#*=}"
+      trim_env_value "${value}"
+      return 0
+    fi
+  done < "${env_path}"
+
+  return 1
+}
+
+RPI_SSH_HOST="$(read_env_value RPI_SSH_HOST || true)"
+RPI_SSH_PORT="$(read_env_value RPI_SSH_PORT || true)"
+RPI_SSH_USER="$(read_env_value RPI_SSH_USER || true)"
+RPI_SSH_KEY_PATH="$(read_env_value RPI_SSH_KEY_PATH || true)"
 
 RPI_SSH_HOST="${RPI_SSH_HOST:-raspberrypi.local}"
 RPI_SSH_PORT="${RPI_SSH_PORT:-22}"
 RPI_SSH_USER="${RPI_SSH_USER:-pi}"
+if [[ "${RPI_SSH_KEY_PATH}" == "~/"* ]]; then
+  RPI_SSH_KEY_PATH="${HOME}/${RPI_SSH_KEY_PATH#"~/"}"
+fi
 REMOTE_DIR="/opt/raspberry-smarthome"
 
 # Build SSH options
@@ -62,10 +97,33 @@ if [[ -n "${RPI_SSH_KEY_PATH:-}" ]]; then
 fi
 SSH_TARGET="${RPI_SSH_USER}@${RPI_SSH_HOST}"
 
-# deploy_agent_env: filter LLM_* lines from local .env and write the result to
-# /etc/perseus-smarthome/agent.env on the Pi as root:root mode 0600.
-# Re-runs overwrite the file deterministically. RPI_* and AGENT_* variables
-# stay on the operator machine and are never written to the on-Pi file.
+# Approved agent-runtime keys copied from local .env to the Pi-side
+# EnvironmentFile. RPI_* and AGENT_* variables stay on the operator machine.
+AGENT_ENV_KEYS=(
+  OPENROUTER_API_KEY
+  OPENAI_API_KEY
+  ANTHROPIC_API_KEY
+  LANGSMITH_TRACING_V2
+  LANGSMITH_ENDPOINT
+  LANGSMITH_API_KEY
+  LANGSMITH_PROJECT
+  LLM_API_BASE_URL
+  LLM_MODEL
+  LLM_API_KEY
+)
+
+collect_agent_env() {
+  local key value
+  for key in "${AGENT_ENV_KEYS[@]}"; do
+    if value="$(read_env_value "${key}")"; then
+      printf '%s=%s\n' "${key}" "${value}"
+    fi
+  done
+}
+
+# deploy_agent_env: filter approved agent-runtime keys from local .env and
+# write the result to /etc/perseus-smarthome/agent.env on the Pi as root:root
+# mode 0600. Re-runs overwrite the file deterministically.
 deploy_agent_env() {
   local env_path="${REPO_ROOT}/.env"
   if [[ ! -f "${env_path}" ]]; then
@@ -74,13 +132,13 @@ deploy_agent_env() {
   fi
 
   local filtered
-  filtered="$(grep -E '^LLM_[A-Z0-9_]+=' "${env_path}" || true)"
+  filtered="$(collect_agent_env)"
   if [[ -z "${filtered}" ]]; then
-    echo "==> Skipping agent.env deployment: no LLM_* keys in ${env_path}"
+    echo "==> Skipping agent.env deployment: no approved agent keys in ${env_path}"
     return 0
   fi
 
-  echo "==> Deploying /etc/perseus-smarthome/agent.env (LLM_* keys, 0600 root:root)"
+  echo "==> Deploying /etc/perseus-smarthome/agent.env (agent keys, 0600 root:root)"
   printf '%s\n' "${filtered}" | ssh "${SSH_OPTS[@]}" "${SSH_TARGET}" \
     "sudo install -d -m 0755 -o root -g root /etc/perseus-smarthome && \
      sudo install -m 0600 -o root -g root /dev/null /etc/perseus-smarthome/agent.env && \
@@ -115,8 +173,8 @@ if [[ "${SUBCOMMAND}" == "install" || "${SUBCOMMAND}" == "upgrade" ]]; then
 
   rsync "${RSYNC_OPTS[@]}" "${REPO_ROOT}/" "${SSH_TARGET}:${REMOTE_DIR}/"
 
-  # Deploy LLM_* secrets before install.sh enables/restarts rpi-io-agent.service
-  # so the unit picks up the env on first start.
+  # Deploy agent env before install.sh enables/restarts rpi-io-agent.service
+  # so the unit picks up provider keys on first start.
   deploy_agent_env
 
   echo "==> Running install.sh ${SUBCOMMAND} on Pi"

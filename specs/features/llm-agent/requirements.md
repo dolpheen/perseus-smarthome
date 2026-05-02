@@ -1,7 +1,7 @@
 # LLM Agent Layer
 
 Status: Approved
-Last reviewed: 2026-05-02
+Last reviewed: 2026-05-03
 Owner: Vadim
 Parent spec: ../../project.spec.md
 Related code: TBD
@@ -223,12 +223,20 @@ not be able to toggle pins or devices that are not configured in
 - Service user: both install paths run the agent service as
   `User=perseus-smarthome` (deployment-spec amendment, see Resolved
   Decisions #8).
-- Secrets at rest on the Pi: `LLM_API_KEY` and any other `LLM_*` key
-  live in `/etc/perseus-smarthome/agent.env` with mode `0600`, owner
-  `root`, loaded by systemd via `EnvironmentFile=`. The repo-root
-  `.env` (gitignored) is the source of truth on the operator's
-  MacBook; `scripts/remote-install.sh` filters and copies the
-  `LLM_*` keys to the Pi-side env file (Resolved Decisions #9).
+- Secrets at rest on the Pi: provider keys (`OPENROUTER_API_KEY`,
+  `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`) and optional LangSmith
+  tracing keys (`LANGSMITH_*`) live in
+  `/etc/perseus-smarthome/agent.env` with mode `0600`, owner
+  `root`, loaded by systemd via `EnvironmentFile=`. `OPENROUTER_API_KEY`
+  is the clearest credential for the default OpenRouter path; the
+  OpenAI-compatible `OPENAI_API_KEY` is also accepted so LangChain
+  conventions work unchanged. `LLM_API_KEY` is still accepted and
+  deployed as a legacy fallback for existing local env files, but new
+  setups should use `OPENROUTER_API_KEY` or `OPENAI_API_KEY`. The
+  repo-root `.env` (gitignored) is the
+  source of truth on the operator's MacBook; `scripts/remote-install.sh`
+  filters and copies only the approved agent-runtime keys to the Pi-side
+  env file (Resolved Decisions #9).
 - Secrets in repo: `.env` is gitignored. `.env.example` documents
   new variable names without values.
 - Logs: chat service must log to journald via systemd. Logs must not
@@ -253,14 +261,29 @@ not be able to toggle pins or devices that are not configured in
   instantiated through LangChain's `init_chat_model` and handed to
   `deepagents.create_deep_agent(model=...)` — `deepagents` owns the
   model lifecycle. Provider can be swapped by changing `LLM_MODEL`,
-  `LLM_API_BASE_URL`, and `LLM_API_KEY` in `.env` without code
-  changes (for any OpenAI-compatible endpoint). Switching to a
+  `LLM_API_BASE_URL`, and `OPENROUTER_API_KEY` / `OPENAI_API_KEY` in
+  `.env` without code changes (for any OpenAI-compatible endpoint).
+  `LLM_API_KEY` remains a deprecated fallback alias for the credential.
+  Switching to a
   non-compatible provider only adds a `model_provider` change in the
   agent factory.
 - Existing `rpi-io-mcp` streamable HTTP MCP endpoint
   (`http://<pi>:8000/mcp`).
 - Local `.env` variables (additions to `.env.example`):
-  - `LLM_API_KEY` — provider credential (OpenRouter API key by default).
+  - `OPENAI_API_KEY` — OpenAI-compatible provider credential
+    (also accepted for OpenRouter because that endpoint is
+    OpenAI-compatible).
+  - `OPENROUTER_API_KEY` — explicit OpenRouter credential for the
+    default provider route; preferred when both it and `OPENAI_API_KEY`
+    are set and `LLM_API_BASE_URL` points at OpenRouter.
+  - `ANTHROPIC_API_KEY` — native Anthropic provider credential; not used
+    by the default OpenAI-compatible path but kept aligned with
+    LangChain / Deep Agents conventions.
+  - `LANGSMITH_TRACING_V2`, `LANGSMITH_ENDPOINT`,
+    `LANGSMITH_API_KEY`, `LANGSMITH_PROJECT` — optional LangSmith
+    tracing configuration consumed by LangChain when enabled.
+  - `LLM_API_KEY` — deprecated fallback credential accepted for
+    backwards compatibility; new env files should not use it.
   - `LLM_API_BASE_URL` — default `https://openrouter.ai/api/v1`.
   - `LLM_MODEL` — default `tencent/hy3-preview:free`. Consumed by
     `init_chat_model(model=...)` and the `BaseChatModel` is then
@@ -346,8 +369,9 @@ not be able to toggle pins or devices that are not configured in
   service. Verifies the Phase A MCP-client reconnect path
   (`AGENT-FR-012`). Phase B additionally verifies that aliases are
   still resolvable after the MCP cycle (`AGENT-FR-024`).
-- Service-startup test: start the agent service with `LLM_API_KEY`
-  unset or empty. The service must come up in degraded mode, the
+- Service-startup test: start the agent service with
+  `OPENROUTER_API_KEY` and `OPENAI_API_KEY` unset or empty (and no
+  legacy `LLM_API_KEY`). The service must come up in degraded mode, the
   WebSocket must accept connections, and the next operator turn must
   return a chat-visible configuration error without revealing key
   contents (`AGENT-FR-010`, `AGENT-FR-011`).
@@ -409,11 +433,16 @@ Owner-approved 2026-05-02:
    the unit's `User=` line and `chown` of `/opt/raspberry-smarthome`
    are the only on-disk effects.
 9. **Agent secret deployment.** The local `.env` at the repo root
-   continues to hold `LLM_*` keys alongside the existing `RPI_*`
-   keys. `scripts/remote-install.sh` is extended to filter just the
-   `LLM_*` keys and write them to `/etc/perseus-smarthome/agent.env`
-   on the Pi with mode `0600` and owner `root`. `MacBook RPI_*`
-   credentials are explicitly excluded from the Pi-side file.
+   holds provider keys (`OPENROUTER_API_KEY`, `OPENAI_API_KEY`,
+   `ANTHROPIC_API_KEY`), optional LangSmith tracing keys
+   (`LANGSMITH_*`), model routing keys (`LLM_MODEL`,
+   `LLM_API_BASE_URL`), and the existing `RPI_*` deploy keys.
+   `scripts/remote-install.sh` filters only the approved
+   agent-runtime keys and writes them to
+   `/etc/perseus-smarthome/agent.env` on the Pi with mode `0600`
+   and owner `root`. `LLM_API_KEY` is included only as a deprecated
+   fallback alias. MacBook `RPI_*` credentials are explicitly excluded
+   from the Pi-side file.
    Re-running `make remote-install` overwrites the file
    idempotently. The deb path documents a manual operator step
    (create the file by hand) since secrets cannot ship inside the
@@ -490,9 +519,11 @@ and Change Log).
   `config/rpi-io.toml` directly. (B3) Service user is standardized
   to `perseus-smarthome` across both install paths (Phase A
   deployment prereq; reverses deployment-spec Resolved Decision #1).
-  (B4) `LLM_*` keys live in the same root `.env`;
-  `scripts/remote-install.sh` filters them into
+  (B4) the then-current `LLM_*` key set lives in the same root `.env`;
+  `scripts/remote-install.sh` filters it into
   `/etc/perseus-smarthome/agent.env` (mode 0600, root) on the Pi.
+  The env-key shape is superseded by the 2026-05-03 LangChain /
+  OpenRouter sync entry below.
   (I2) Multi-session policy is most-recent-wins; prior session is
   closed with `session_superseded`. (I5/I6) Added explicit
   prompt-injection refusal and MCP-restart resilience tests to
@@ -505,3 +536,10 @@ and Change Log).
   Approved. Phase A implementation issues `LLM-A-0` through
   `LLM-A-10` may be opened per `tasks.md`. Phase B issues remain
   gated on Phase A closeout.
+- 2026-05-03: Env contract synchronized with LangChain / Deep Agents
+  conventions. `OPENROUTER_API_KEY` is now the explicit default-route
+  credential, `OPENAI_API_KEY` remains accepted for OpenAI-compatible
+  endpoints, and `ANTHROPIC_API_KEY` / `LANGSMITH_*` are
+  documented/deployed for framework compatibility. `LLM_API_KEY`
+  remains a deprecated fallback so existing installs do not break
+  abruptly.
