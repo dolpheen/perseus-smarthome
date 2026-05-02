@@ -13,6 +13,13 @@ dependencies = [
   # Pi. macOS, Windows, and CI on x86_64 Linux skip it; tests use the
   # mock GPIO adapter from #4.
   "lgpio>=0.2; sys_platform == 'linux' and platform_machine in 'armv6l armv7l aarch64'",
+  # LLM agent layer (Milestone 2 / Phase A): deepagents pulls langchain +
+  # langgraph transitively; langchain-openai resolves init_chat_model with
+  # model_provider="openai"; websockets provides the WebSocket server for
+  # the agent chat endpoint.
+  "deepagents>=0.5.6",
+  "langchain-openai>=1.2.1",
+  "websockets>=16.0",
 ]
 # Raspberry Pi 2 (armv7l) provisioning note for issue #7 (deploy):
 # Several runtime deps source-build on armv7l because no manylinux*_armv7l
@@ -38,4 +45,5 @@ testpaths = ["tests"]
 markers = [
   "e2e: tests that require a reachable Raspberry Pi MCP server",
   "hardware: tests that require Raspberry Pi GPIO wiring",
+  "llm: tests that call the real LLM provider (pass --run-llm to opt in)",
 ]
