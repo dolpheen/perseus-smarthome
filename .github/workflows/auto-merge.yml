@@ -86,9 +86,10 @@ jobs:
           opt_out_labels=("critical" "needs-manual-verification" "do-not-merge")
           required_checks=("pytest")
 
-          pr_data=$(gh pr view "$PR_NUMBER" --repo "$REPO" --json state,isDraft,labels,mergeable,mergeStateStatus)
+          pr_data=$(gh pr view "$PR_NUMBER" --repo "$REPO" --json state,isDraft,labels,mergeable,mergeStateStatus,author)
           state=$(jq -r '.state' <<<"$pr_data")
           is_draft=$(jq -r '.isDraft' <<<"$pr_data")
+          pr_author=$(jq -r '.author.login // ""' <<<"$pr_data")
 
           if [[ "$state" != "OPEN" || "$is_draft" == "true" ]]; then
             echo "PR not eligible: state=$state, draft=$is_draft"
@@ -199,6 +200,41 @@ jobs:
             ] | length' <<<"$copilot_review_json")
           if [[ "$copilot_changes" -gt 0 ]]; then
             echo "Copilot has CHANGES_REQUESTED on the PR; not merging"
+            echo "merge=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # Require at least one substantive non-author review. A review
+          # by a human reviewer, copilot-pull-request-reviewer, or any
+          # future bot counts as long as it is in APPROVED or COMMENTED
+          # state and was authored by someone other than the PR author.
+          # Without this, an operator-pushed PR that nobody requested a
+          # reviewer on would auto-merge unseen — observed on PR #94,
+          # which merged with no review at all because no reviewer was
+          # requested.
+          # CHANGES_REQUESTED is treated as a block (for both Copilot
+          # above and humans below), DISMISSED/PENDING do not count.
+          substantive_reviews=$(jq --arg author "$pr_author" '
+            [.data.repository.pullRequest.latestReviews.nodes[]
+             | select((.author.login // "") != $author)
+             | select(.state == "APPROVED" or .state == "COMMENTED")
+            ] | length' <<<"$copilot_review_json")
+          if [[ "$substantive_reviews" -lt 1 ]]; then
+            echo "PR has no substantive non-author review (need APPROVED or COMMENTED from a reviewer); not merging"
+            echo "merge=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          # Block on any non-author CHANGES_REQUESTED, not only Copilot's.
+          # The Copilot-specific check above keeps its dedicated log line;
+          # this catches human reviewers requesting changes.
+          human_changes=$(jq --arg author "$pr_author" '
+            [.data.repository.pullRequest.latestReviews.nodes[]
+             | select((.author.login // "") != $author)
+             | select((.author.login // "") != "copilot-pull-request-reviewer")
+             | select(.state == "CHANGES_REQUESTED")
+            ] | length' <<<"$copilot_review_json")
+          if [[ "$human_changes" -gt 0 ]]; then
+            echo "A reviewer has CHANGES_REQUESTED on the PR; not merging"
             echo "merge=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
