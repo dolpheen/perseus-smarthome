@@ -4,12 +4,9 @@ This guide covers installing and managing the `rpi-io-mcp` systemd service on
 Raspberry Pi OS Lite 32-bit (Debian Trixie).
 
 Hardware target: Raspberry Pi 2.  
-Service user: `RPI_SSH_USER` from `.env` (default `pi`; must be in the `gpio`
-group). The repo's unit file uses `pi` as the canonical Raspbian default, and
-`scripts/remote-install.sh` passes `--user "$RPI_SSH_USER"` to
-`scripts/install.sh` on the Pi, which rewrites `User=` to match at install time
-so a Pi with a custom primary user (e.g. `perseus`) works without editing the
-unit by hand.  
+Service user: `perseus-smarthome` (a dedicated system user created at install
+time by both install paths; see `specs/features/deployment/design.md::Resolved
+Design Decisions::1`).  
 Project directory on Pi: `/opt/raspberry-smarthome` (fixed; not configurable via
 `RPI_PROJECT_DIR` so the systemd unit, install scripts, and docs all agree
 without runtime templating of paths).
@@ -36,15 +33,16 @@ without runtime templating of paths).
    # or: pip install uv
    ```
 
-3. Ensure the deploy user (the one in `RPI_SSH_USER`, default `pi`) is in the
-   `gpio` group:
+   The `install.sh` script also handles `uv` installation automatically, so
+   this step can be skipped when using `make remote-install`.
 
-   ```bash
-   groups "$USER"   # should include gpio
-   # If not:
-   sudo usermod -aG gpio "$USER"
-   # Log out and back in, or reboot, to apply.
-   ```
+3. Ensure the SSH user (from `RPI_SSH_USER` in `.env`) exists on the Pi. The
+   install script uses this account to run `uv sync` and creates the dedicated
+   `perseus-smarthome` service user automatically.
+
+> **Existing script-install operators:** after this change lands, run
+> `make remote-install` once to create the `perseus-smarthome` system user
+> and migrate ownership. The service will then run as `User=perseus-smarthome`.
 
 ### On the MacBook (deploy machine)
 
@@ -93,8 +91,8 @@ You can also invoke the script directly when `make` is not available:
 
 The `.deb` is built on the Pi (armv7l) and bundles a self-contained venv,
 so installs are atomic and need no source build at install time. The
-service runs as a dedicated system user `perseus-smarthome` (created by
-`postinst`) instead of the deploy user — see
+service runs as the dedicated system user `perseus-smarthome` (created by
+`postinst`), matching the script-install path — see
 `specs/features/deployment/design.md::Resolved Design Decisions::1`.
 
 Mixing the deb path and the script path on the same Pi is unsupported
@@ -132,16 +130,19 @@ rsync -az --delete \
 # 2. SSH into the Pi
 ssh pi@raspberrypi.local
 
-# 3. On the Pi: install dependencies
+# 3. On the Pi: create service user if missing
+sudo adduser --system --group --home /opt/raspberry-smarthome \
+  --shell /usr/sbin/nologin --no-create-home perseus-smarthome
+sudo usermod -aG gpio perseus-smarthome
+sudo chown -R perseus-smarthome:gpio /opt/raspberry-smarthome
+
+# 4. On the Pi: install dependencies (run as your SSH user who has uv)
 cd /opt/raspberry-smarthome
 uv sync --no-dev
+sudo chown -R perseus-smarthome:gpio /opt/raspberry-smarthome
 
-# 4. On the Pi: install the systemd unit (rewriting User= when the
-#    deploy user isn't `pi`)
-sudo sed \
-    -e "s|^User=pi$|User=$USER|" \
-    deploy/systemd/rpi-io-mcp.service \
-    | sudo tee /etc/systemd/system/rpi-io-mcp.service > /dev/null
+# 5. On the Pi: install the systemd unit (User=perseus-smarthome is already set)
+sudo cp deploy/systemd/rpi-io-mcp.service /etc/systemd/system/rpi-io-mcp.service
 sudo systemctl daemon-reload
 sudo systemctl enable rpi-io-mcp.service
 sudo systemctl start rpi-io-mcp.service

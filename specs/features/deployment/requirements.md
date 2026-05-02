@@ -97,15 +97,16 @@ tool contract, the GPIO behavior, or the trusted-LAN security posture.
   `swig`, `liblgpio-dev`).
 - DEP-FR-004: `scripts/install.sh install` must install `uv` if it is not
   already on PATH for the deploy user, using the upstream installer.
-- DEP-FR-005: `scripts/install.sh install` must add the deploy user to the
-  `gpio` group if not already a member, and warn the operator that they must
-  re-login or reboot before the service can access GPIO if the group was
-  newly added.
+- DEP-FR-005: `scripts/install.sh install` must create the `perseus-smarthome`
+  system user if not already present (home `/opt/raspberry-smarthome`, shell
+  `/usr/sbin/nologin`, no interactive login) and add it to the `gpio` group.
+  This mirrors the behavior of `packaging/debian/postinst` so both install
+  paths share the same service-user model.
 - DEP-FR-006: `scripts/install.sh install` must stage the project under
-  `/opt/raspberry-smarthome` with ownership matching the deploy user and the
-  `gpio` group, run `uv sync --no-dev`, render and install the systemd unit
-  to `/etc/systemd/system/rpi-io-mcp.service`, run `systemctl daemon-reload`,
-  and `systemctl enable --now rpi-io-mcp.service`.
+  `/opt/raspberry-smarthome` with ownership `perseus-smarthome:gpio`, run
+  `uv sync --no-dev`, install the systemd unit (already contains
+  `User=perseus-smarthome`) to `/etc/systemd/system/rpi-io-mcp.service`, run
+  `systemctl daemon-reload`, and `systemctl enable --now rpi-io-mcp.service`.
 - DEP-FR-007: `scripts/install.sh upgrade` must update an existing install in
   place without changing the deploy user, then restart the service. It must
   fail clearly if no install is detected.
@@ -326,12 +327,14 @@ All four questions raised against the Draft were resolved in
 `design.md::Resolved Design Decisions` and are recorded here for
 traceability. They are no longer open.
 
-1. **Resolved.** Service user model for the `.deb`: divergent by design.
-   Script path runs the service as the deploy user; `.deb` creates a
-   dedicated `perseus-smarthome` system user in `postinst`. Both are
-   added to the `gpio` group. Mixing the two paths on the same Pi is
-   explicitly unsupported. See `design.md::Resolved Design Decisions::1`
-   and `Cross-Path Coexistence`.
+1. **Revised (LLM-A-0, 2026-05-02).** Both install paths now run the service
+   as `User=perseus-smarthome`. The script path creates the
+   `perseus-smarthome` system user at install time, mirroring the deb
+   `postinst`. The original "divergent by design" rationale is reversed: Phase
+   A of Milestone 2 requires a single ownership model under
+   `/var/lib/perseus-smarthome/` for the agent alias store and long-term
+   memory. See `design.md::Resolved Design Decisions::1` and
+   `Cross-Path Coexistence`.
 2. **Resolved.** systemd `ExecStart` form: switched to
    `/opt/raspberry-smarthome/.venv/bin/rpi-io-mcp`. Drops the runtime
    `uv` dependency and the per-user `~/.local/bin` path. See
@@ -383,3 +386,14 @@ traceability. They are no longer open.
   to `$HOME` which the system user could not write); see `design.md`
   "Decisions Discovered During Implementation" for the resolutions.
   Status flipped from Approved to Implemented.
+- 2026-05-02: LLM-A-0. Reversed Resolved Decision #1 ("divergent by
+  design"). Both install paths now run the service as
+  `User=perseus-smarthome`. The script path creates the
+  `perseus-smarthome` system user at install time (mirrors deb
+  `postinst`). Updated DEP-FR-005 and DEP-FR-006. The `--user` flag on
+  `install` is now a no-op for backward compat;
+  `scripts/remote-install.sh` no longer passes `--user <RPI_SSH_USER>`.
+  The canonical `deploy/systemd/rpi-io-mcp.service` `User=` changed from
+  `pi` to `perseus-smarthome`; the `sed` rewrite in install step 7 is
+  dropped. Operators on an existing script-install must re-run
+  `make remote-install` once to migrate.

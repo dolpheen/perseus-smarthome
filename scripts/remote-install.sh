@@ -15,8 +15,8 @@
 #   RPI_SSH_KEY_PATH — path to SSH private key, or leave blank to use ssh-agent
 #
 # For install/upgrade: rsyncs the working tree to /opt/raspberry-smarthome on
-# the Pi, then SSHs and runs scripts/install.sh <subcommand>; --user is only
-# passed for install (upgrade reads the deploy user from the installed unit).
+# the Pi, then SSHs and runs scripts/install.sh <subcommand>. The service
+# always runs as User=perseus-smarthome; no --user flag is passed.
 # For uninstall/status: SSH only — no rsync needed.
 
 set -euo pipefail
@@ -83,24 +83,16 @@ if [[ "${SUBCOMMAND}" == "install" || "${SUBCOMMAND}" == "upgrade" ]]; then
   )
 
   echo "==> Syncing project to ${SSH_TARGET}:${REMOTE_DIR}"
-  # Ensure the remote directory exists and is owned by the deploy user.
-  # Use -R so that root-owned files from a previous install are also reclassified
-  # before rsync writes new files under the same tree.
+  # Ensure the remote directory exists and is writable by the SSH user for rsync.
+  # install.sh will chown the tree to perseus-smarthome:gpio after staging.
   ssh "${SSH_OPTS[@]}" "${SSH_TARGET}" \
     "sudo mkdir -p '${REMOTE_DIR}' && sudo chown -R '${RPI_SSH_USER}:gpio' '${REMOTE_DIR}'"
 
   rsync "${RSYNC_OPTS[@]}" "${REPO_ROOT}/" "${SSH_TARGET}:${REMOTE_DIR}/"
 
   echo "==> Running install.sh ${SUBCOMMAND} on Pi"
-  if [[ "${SUBCOMMAND}" == "install" ]]; then
-    # Pass --user only for install; upgrade reads the deploy user from the
-    # already-installed systemd unit and ignores --user.
-    ssh -t "${SSH_OPTS[@]}" "${SSH_TARGET}" \
-      "sudo /opt/raspberry-smarthome/scripts/install.sh '${SUBCOMMAND}' --user '${RPI_SSH_USER}'"
-  else
-    ssh -t "${SSH_OPTS[@]}" "${SSH_TARGET}" \
-      "sudo /opt/raspberry-smarthome/scripts/install.sh '${SUBCOMMAND}'"
-  fi
+  ssh -t "${SSH_OPTS[@]}" "${SSH_TARGET}" \
+    "sudo /opt/raspberry-smarthome/scripts/install.sh '${SUBCOMMAND}'"
 else
   # uninstall / status — SSH only, no rsync.
   echo "==> Running install.sh ${SUBCOMMAND} on Pi"
