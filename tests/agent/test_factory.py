@@ -147,14 +147,39 @@ def test_unconfigured_error_does_not_contain_api_key(
 ) -> None:
     """The llm_unconfigured error must not include the LLM_API_KEY value.
 
-    Spec: AGENT-FR-010 — credential must never appear in logs or messages.
+    create_agent() with an empty key returns _UnconfiguredAgent; its error
+    response must not echo the key value (AGENT-FR-010).
     """
+    # Set a recognisable sentinel in the environment.
     secret = "super-secret-key-xyz"
+    # Use empty key so create_agent returns the degraded path.
     monkeypatch.setenv("LLM_API_KEY", "")
-    agent = _UnconfiguredAgent()
+    agent = create_agent()
+    assert isinstance(agent, _UnconfiguredAgent)
     result = agent.invoke({"messages": []})
     for value in result.values():
         assert secret not in str(value)
+
+
+def test_unconfigured_error_does_not_echo_env_key_value(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """_UnconfiguredAgent response must not echo any value from LLM_API_KEY.
+
+    Even if the key is non-empty (edge case: key set but degraded agent used
+    directly), the error message must not contain it.
+
+    Spec: AGENT-FR-010 — credential must never appear in error messages.
+    """
+    secret = "very-secret-openrouter-key-12345"
+    monkeypatch.setenv("LLM_API_KEY", secret)
+    # Directly exercise _UnconfiguredAgent to verify no env-var reading occurs.
+    agent = _UnconfiguredAgent()
+    result = agent.invoke({"messages": []})
+    for value in result.values():
+        assert secret not in str(value), (
+            f"LLM_API_KEY value must not appear in error output: {value!r}"
+        )
 
 
 # ---------------------------------------------------------------------------

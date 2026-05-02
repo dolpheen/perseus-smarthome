@@ -163,12 +163,22 @@ def _inline_phase_a_tools(mcp_url: str) -> list[Any]:
     from langchain_core.tools import tool  # noqa: PLC0415
 
     def _post(tool_name: str, arguments: dict[str, Any] | None = None) -> dict[str, Any]:
-        resp = httpx.post(
-            mcp_url,
-            json={"jsonrpc": "2.0", "method": "tools/call", "params": {"name": tool_name, "arguments": arguments or {}}, "id": 1},
-            timeout=10.0,
-        )
-        resp.raise_for_status()
+        try:
+            resp = httpx.post(
+                mcp_url,
+                json={
+                    "jsonrpc": "2.0",
+                    "method": "tools/call",
+                    "params": {"name": tool_name, "arguments": arguments or {}},
+                    "id": 1,
+                },
+                timeout=10.0,
+            )
+            resp.raise_for_status()
+        except httpx.HTTPError as exc:
+            raise RuntimeError(
+                f"MCP tool call failed: {tool_name}({arguments})"
+            ) from exc
         return resp.json()
 
     @tool
