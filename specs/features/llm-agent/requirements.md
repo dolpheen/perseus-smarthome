@@ -421,9 +421,8 @@ Owner-approved 2026-05-02:
 
 ## Open Questions
 
-None. All blocking decisions are resolved (see Resolved Decisions and
-Change Log). Spec is ready for owner review to flip Status from
-`Draft` to `Approved`.
+None. All blocking decisions are resolved (see Resolved Decisions
+and Change Log).
 
 ## Residual Risks
 

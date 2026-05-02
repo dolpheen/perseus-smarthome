@@ -492,8 +492,7 @@ Owner-approved 2026-05-02:
 
 ## Open Design Decisions
 
-None. All design decisions are resolved. Spec is ready for owner
-review to flip Status from Draft to Approved.
+None. All design decisions are resolved.
 
 ## Residual Risks
 

@@ -71,8 +71,7 @@ to `perseus-smarthome` across both install paths (deployment
 prereq task `LLM-A-0`). Multi-session policy: most-recent-wins
 with `session_superseded`. `LLM_*` keys live in repo-root `.env`
 and are filtered into `/etc/perseus-smarthome/agent.env` by
-`scripts/remote-install.sh`. Spec is ready for the Status flip
-from Draft to Approved.
+`scripts/remote-install.sh`.
 
 ## GitHub Implementation Issues (proposed)
 
@@ -467,12 +466,8 @@ acceptance, link to FR ids).
   lines to every Phase A and Phase B task per AGENTS.md issue
   shape. Dependency Order section updated to reflect the new
   blocks/blockedBy edges.
-- 2026-05-02: Owner approved. Status flipped from Draft to
-  Approved. Phase A implementation issues `LLM-A-0` through
-  `LLM-A-10` may be opened per the GitHub Implementation Issues
-  list above. Phase B issues remain gated on Phase A closeout.
-- 2026-05-02 (review punch-list): Three cross-reference defects
-  surfaced and fixed. (1) `LLM-A-8b` scenario 4 traced the
+- 2026-05-02 (review punch-list, pre-approval): Three
+  cross-reference defects surfaced and fixed. (1) `LLM-A-8b` scenario 4 traced the
   MCP-restart resilience test to `AGENT-FR-024` (Phase B alias
   persistence); added a new Phase A `AGENT-FR-012` for
   MCP-client transparent-reconnect and retargeted both the
@@ -503,3 +498,7 @@ acceptance, link to FR ids).
   supplementary group. A follow-up hardening (drop the
   supplementary `gpio` membership for `perseus-smarthome`) is
   noted as out of scope for Phase A.
+- 2026-05-02: Owner approved. Status flipped from Draft to
+  Approved. Phase A implementation issues `LLM-A-0` through
+  `LLM-A-10` may be opened per the GitHub Implementation Issues
+  list above. Phase B issues remain gated on Phase A closeout.
