@@ -137,9 +137,18 @@ Expected structured result:
       "capabilities": ["read_input"],
       "state": 0
     }
-  ]
+  ],
+  "rate_limit": {
+    "output_min_interval_ms": 250
+  }
 }
 ```
+
+The `rate_limit.output_min_interval_ms` field is always present.  It
+defaults to `250` when the optional `[rate_limit]` table is absent from
+`config/rpi-io.toml`, or equals the configured value when present.
+Pre-Phase-A clients that ignore the field continue to work without
+change (IO-MCP-FR-017).
 
 ### `set_output`
 
@@ -336,3 +345,4 @@ decisions.
 - 2026-04-30: Owner approved the listen-address decision with the rest of Milestone 1 (issue `#1` closed). Section retitled "Resolved Design Decisions".
 - 2026-05-01: Implementation landed (#32, #35, #36, #38). Added "Decisions Discovered During Implementation" section capturing the loopback-wiring revision, systemd User= templating, absolute uv ExecStart, SIGTERM handler, partial-init cleanup, hardware-skip conftest, and the wider apt prereq list. Status remains Approved pending Pi reboot persistence and Codex MCP smoke per `tasks.md` task 10.
 - 2026-05-01: Closeout (issue `#9`) complete. Pi reboot persistence and Codex MCP smoke both passed. Status flipped from Approved to Implemented; Last reviewed bumped to 2026-05-01.
+- 2026-05-02: Additive change — `list_devices` response extended with a top-level `rate_limit.output_min_interval_ms` field (default 250 ms when `[rate_limit]` is absent from config). MCP contract section updated; pre-existing clients unaffected (IO-MCP-FR-017, LLM-A-2).
