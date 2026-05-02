@@ -33,6 +33,9 @@ Before implementation, read:
 - `specs/features/rpi-io-mcp/requirements.md`
 - `specs/features/rpi-io-mcp/design.md`
 - `specs/features/rpi-io-mcp/tasks.md`
+- `specs/features/llm-agent/requirements.md`
+- `specs/features/llm-agent/design.md`
+- `specs/features/llm-agent/tasks.md`
 
 ## Current Status
 
@@ -103,12 +106,22 @@ Implemented for Milestone 1:
 
 ## What To Do Next
 
-Milestone 1 is complete. Future milestones (not yet specified or scheduled)
-will likely cover:
+Milestone 1 is complete. Milestone 2 (LLM agent layer) is at
+`Status: Approved` as of 2026-05-02 across all three files under
+`specs/features/llm-agent/` (`requirements.md`, `design.md`,
+`tasks.md`). Phase A implementation issues `LLM-A-0` through
+`LLM-A-10` are ready to open per `tasks.md`. Phase A includes a
+deployment-spec prereq task (`LLM-A-0`) that reverses
+`specs/features/deployment/` Resolved Decision #1 by standardizing
+both install paths on `User=perseus-smarthome`; that amendment lands
+in the same `LLM-A-0` cycle. Phase B implementation is gated on
+Phase A closeout per the spec's separate-approval-gates decision.
 
-- CC2531 USB stick connectivity and Zigbee device support (see `specs/project.spec.md` Open Questions).
+Other future milestones (not yet specified or scheduled) will likely
+cover:
+
+- CC2531 USB stick connectivity and Zigbee device support (see `specs/project.spec.md` Open Questions; Phase 0 discovery notes are at `docs/zigbee-discovery-notes.md`).
 - Additional connectivity protocols: WiFi, BLE, Z-Wave.
-- LLM agent layer that consumes the MCP tool contract.
 - Persistence of device state and action history (currently process-local).
 - Optional human UI for diagnostics.
 
