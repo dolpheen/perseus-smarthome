@@ -55,7 +55,8 @@ class _UnconfiguredAgent:
             "code": "llm_unconfigured",
             "message": (
                 "LLM API key is not configured. "
-                "Set LLM_API_KEY in .env to enable the agent."
+                "Set LLM_API_KEY in /etc/perseus-smarthome/agent.env on the Pi "
+                "(or in .env on the operator machine, then re-run remote-install)."
             ),
         }
 
@@ -86,8 +87,8 @@ def create_agent(
                Pass a scripted stub here for unit testing.
         tools: Optional list of tool callables to wire into the agent.  Pass
                mock tools for unit testing.  Defaults to the Phase A MCP tool
-               wrappers (from ``agent.mcp_tools`` when available, otherwise from
-               :func:`_inline_phase_a_tools`).
+               wrappers built from :func:`_build_default_tools` (backed by
+               :class:`~perseus_smarthome.agent.mcp_tools.RpiIOMCPTools`).
         mcp_url: MCP server URL passed to the default tools.  Defaults to the
                  ``AGENT_RPI_MCP_URL`` env var or ``http://127.0.0.1:8000/mcp``.
 
@@ -139,75 +140,61 @@ def create_agent(
 
 
 def _build_default_tools(mcp_url: str) -> list[Any]:
-    """Return Phase A MCP tool wrappers targeting *mcp_url*.
+    """Return Phase A async LangChain tool wrappers targeting *mcp_url*.
 
-    Delegates to ``agent.mcp_tools.build_tools`` when that module is available
-    (LLM-A-2).  Falls back to :func:`_inline_phase_a_tools` so the factory is
-    usable before LLM-A-2 lands.
+    Each wrapper opens a fresh streamable-HTTP MCP session via
+    :class:`~perseus_smarthome.agent.mcp_tools.RpiIOMCPTools`, issues the
+    call, and closes the session.  The chat service (LLM-A-5) will pass a
+    long-lived session-backed tool list to ``create_agent()`` directly for
+    production efficiency; this path is used when ``tools=None``.
     """
-    try:
-        from perseus_smarthome.agent.mcp_tools import build_tools  # type: ignore[import-not-found]  # noqa: PLC0415
-
-        return build_tools(mcp_url)
-    except (ImportError, AttributeError):
-        return _inline_phase_a_tools(mcp_url)
-
-
-def _inline_phase_a_tools(mcp_url: str) -> list[Any]:
-    """Minimal synchronous Phase A tool stubs targeting *mcp_url*.
-
-    These tools are used when ``agent.mcp_tools`` (LLM-A-2) has not yet landed.
-    They issue synchronous HTTP requests against the streamable-HTTP MCP endpoint.
-    """
-    import httpx  # noqa: PLC0415
     from langchain_core.tools import tool  # noqa: PLC0415
+    from mcp import ClientSession  # noqa: PLC0415
+    from mcp.client.streamable_http import streamablehttp_client  # noqa: PLC0415
 
-    def _post(tool_name: str, arguments: dict[str, Any] | None = None) -> dict[str, Any]:
-        try:
-            resp = httpx.post(
-                mcp_url,
-                json={
-                    "jsonrpc": "2.0",
-                    "method": "tools/call",
-                    "params": {"name": tool_name, "arguments": arguments or {}},
-                    "id": 1,
-                },
-                timeout=10.0,
-            )
-            resp.raise_for_status()
-        except httpx.HTTPError as exc:
-            raise RuntimeError(
-                f"MCP tool call failed: {tool_name}({arguments})"
-            ) from exc
-        return resp.json()
+    from perseus_smarthome.agent.mcp_tools import RpiIOMCPTools  # noqa: PLC0415
 
     @tool
-    def health() -> dict[str, Any]:
+    async def health() -> dict[str, Any]:
         """Return GPIO service health."""
-        return _post("health")
+        async with streamablehttp_client(mcp_url) as (read, write, _):
+            async with ClientSession(read, write) as session:
+                await session.initialize()
+                return await RpiIOMCPTools.from_session(session).health()
 
     @tool
-    def list_devices() -> dict[str, Any]:
+    async def list_devices() -> dict[str, Any]:
         """List configured GPIO devices with capabilities and current state."""
-        return _post("list_devices")
+        async with streamablehttp_client(mcp_url) as (read, write, _):
+            async with ClientSession(read, write) as session:
+                await session.initialize()
+                return await RpiIOMCPTools.from_session(session).list_devices()
 
     @tool
-    def set_output(device_id: str, value: int) -> dict[str, Any]:
+    async def set_output(device_id: str, value: int) -> dict[str, Any]:
         """Set a configured output device to 0 (off) or 1 (on).
 
         Args:
             device_id: The device ID from list_devices (e.g. ``gpio23_output``).
             value: ``0`` to turn off, ``1`` to turn on.
         """
-        return _post("set_output", {"device_id": device_id, "value": value})
+        async with streamablehttp_client(mcp_url) as (read, write, _):
+            async with ClientSession(read, write) as session:
+                await session.initialize()
+                return await RpiIOMCPTools.from_session(session).set_output(
+                    device_id, value
+                )
 
     @tool
-    def read_input(device_id: str) -> dict[str, Any]:
+    async def read_input(device_id: str) -> dict[str, Any]:
         """Read a configured input device and return 0 or 1.
 
         Args:
             device_id: The device ID from list_devices (e.g. ``gpio24_input``).
         """
-        return _post("read_input", {"device_id": device_id})
+        async with streamablehttp_client(mcp_url) as (read, write, _):
+            async with ClientSession(read, write) as session:
+                await session.initialize()
+                return await RpiIOMCPTools.from_session(session).read_input(device_id)
 
     return [health, list_devices, set_output, read_input]
