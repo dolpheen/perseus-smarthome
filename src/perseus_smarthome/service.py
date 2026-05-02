@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from perseus_smarthome.config import _DEFAULT_OUTPUT_MIN_INTERVAL_MS
 from perseus_smarthome.devices import DeviceRegistry, DeviceError
 from perseus_smarthome.gpio import GPIOAdapter, GPIOError
 
@@ -20,7 +21,7 @@ class GPIOService:
         self,
         registry: DeviceRegistry,
         adapter: GPIOAdapter,
-        rate_limit_ms: int = 250,
+        rate_limit_ms: int = _DEFAULT_OUTPUT_MIN_INTERVAL_MS,
     ) -> None:
         self._registry = registry
         self._adapter = adapter

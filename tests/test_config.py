@@ -329,3 +329,47 @@ def test_load_config_rejects_device_unsupported_kind(tmp_path: Path) -> None:
     )
     with pytest.raises(ConfigError, match="Unsupported device kind"):
         load_config(cfg)
+
+
+# ---------------------------------------------------------------------------
+# get_rate_limit_ms
+# ---------------------------------------------------------------------------
+
+
+def test_get_rate_limit_ms_default_when_absent() -> None:
+    from perseus_smarthome.config import get_rate_limit_ms, _DEFAULT_OUTPUT_MIN_INTERVAL_MS
+
+    assert get_rate_limit_ms({}) == _DEFAULT_OUTPUT_MIN_INTERVAL_MS
+
+
+def test_get_rate_limit_ms_returns_configured_value() -> None:
+    from perseus_smarthome.config import get_rate_limit_ms
+
+    assert get_rate_limit_ms({"rate_limit": {"output_min_interval_ms": 500}}) == 500
+
+
+def test_get_rate_limit_ms_rejects_string() -> None:
+    from perseus_smarthome.config import get_rate_limit_ms
+
+    with pytest.raises(ConfigError, match="non-negative integer"):
+        get_rate_limit_ms({"rate_limit": {"output_min_interval_ms": "fast"}})
+
+
+def test_get_rate_limit_ms_rejects_bool() -> None:
+    from perseus_smarthome.config import get_rate_limit_ms
+
+    with pytest.raises(ConfigError, match="non-negative integer"):
+        get_rate_limit_ms({"rate_limit": {"output_min_interval_ms": True}})
+
+
+def test_get_rate_limit_ms_rejects_negative() -> None:
+    from perseus_smarthome.config import get_rate_limit_ms
+
+    with pytest.raises(ConfigError, match=">= 0"):
+        get_rate_limit_ms({"rate_limit": {"output_min_interval_ms": -1}})
+
+
+def test_get_rate_limit_ms_accepts_zero() -> None:
+    from perseus_smarthome.config import get_rate_limit_ms
+
+    assert get_rate_limit_ms({"rate_limit": {"output_min_interval_ms": 0}}) == 0

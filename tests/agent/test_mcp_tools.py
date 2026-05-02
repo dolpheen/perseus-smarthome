@@ -44,25 +44,6 @@ _LIST_DEVICES_RESULT: dict[str, Any] = {
 }
 
 
-def _make_tools(side_effects: dict[str, Any]) -> tuple[RpiIOMCPTools, AsyncMock]:
-    """Return an RpiIOMCPTools backed by an AsyncMock.
-
-    ``side_effects`` maps tool names to the dict the mock returns when
-    called with that tool name.  A callable value is used as a
-    ``side_effect`` (so it can raise exceptions).
-    """
-    mock = AsyncMock()
-
-    async def _dispatch(name: str, args: dict[str, Any]) -> dict[str, Any]:
-        handler = side_effects[name]
-        if callable(handler) and not isinstance(handler, dict):
-            return await asyncio.coroutine(handler)(name, args) if asyncio.iscoroutinefunction(handler) else handler(name, args)  # type: ignore[arg-type]
-        return handler
-
-    tools = RpiIOMCPTools(_dispatch)
-    return tools, mock
-
-
 def _run(coro: Any) -> Any:
     return asyncio.run(coro)
 
@@ -197,7 +178,7 @@ def test_set_output_translates_invalid_value_error() -> None:
 
     tools = RpiIOMCPTools(failing_call)
     with pytest.raises(MCPToolError) as exc_info:
-        _run(tools.set_output("gpio23_output", 1))
+        _run(tools.set_output("gpio23_output", 2))
     assert exc_info.value.code == "invalid_value"
     assert exc_info.value.message == "Value must be 0 or 1."
 

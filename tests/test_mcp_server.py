@@ -290,6 +290,7 @@ def test_main_registers_sigterm_handler() -> None:
     with (
         patch("signal.signal", side_effect=_record),
         patch("perseus_smarthome.config.load_config"),
+        patch("perseus_smarthome.config.get_rate_limit_ms", return_value=250),
         patch("perseus_smarthome.devices.build_registry"),
         patch("perseus_smarthome.gpio.GPIOZeroAdapter"),
         patch("perseus_smarthome.server.GPIOService", return_value=mock_service),
@@ -317,6 +318,7 @@ def test_main_sigterm_handler_triggers_service_close() -> None:
     with (
         patch("signal.signal"),
         patch("perseus_smarthome.config.load_config"),
+        patch("perseus_smarthome.config.get_rate_limit_ms", return_value=250),
         patch("perseus_smarthome.devices.build_registry"),
         patch("perseus_smarthome.gpio.GPIOZeroAdapter"),
         patch("perseus_smarthome.server.GPIOService", return_value=mock_service),
