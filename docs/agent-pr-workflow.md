@@ -4,7 +4,7 @@ How issues turn into merged code in this repo. Read this before opening a PR.
 
 ## Lifecycle
 
-1. **Issue** — every behavior change starts from a GitHub issue with concrete acceptance criteria. Issues are gated by `Blocked by:` relationships; do not start an issue whose blockers are still open.
+1. **Issue** — every behavior change starts from a GitHub issue with concrete acceptance criteria. Issues are gated by blocked-by relationships; do not start an issue whose blockers are still open. Both forms are kept in sync: a text `## Blocked by` section in the body for human readers, **and** native GitHub Issue Dependencies (the Issues UI `Blocked by` panel) for machine-enforced ordering. See [Populating Issue Dependencies](#populating-issue-dependencies) for the API recipe.
 2. **Branch** — work on a feature branch. Direct pushes to `main` are blocked.
 3. **PR** — open a pull request. The PR body must reference the issue with `Closes #N` (or `Fixes #N` / `Resolves #N`) so GitHub links them.
 4. **Checks** — one required CI check runs automatically:
@@ -25,6 +25,30 @@ Apply these to the **issue** (preferred — labels propagate through `Closes #N`
 | `needs-manual-verification` | Acceptance requires human-run verification CI cannot perform: smoke tests, hardware E2E, manual smoke checks on the Raspberry Pi, anything reading `RPI_MCP_URL`. |
 | `critical` | Risky or sensitive change that benefits from explicit human review before merge: security-adjacent code, deployment scripts, anything that touches the GPIO allowlist or secret handling. |
 | `do-not-merge` | Generic block; use for in-flight PRs that should not merge yet. |
+
+## Populating Issue Dependencies
+
+When opening a batch of issues for a milestone phase, populate native GitHub Issue Dependencies in addition to the text `## Blocked by` body section. Native dependencies surface in the Issues UI's `Blocked by` panel and let parallel agents pick up unblocked issues without re-reading bodies.
+
+Workflow:
+
+1. Derive the DAG from the feature's `tasks.md` "Dependency Order" section. Encode only **direct** edges — transitive blockers fall out of the graph.
+2. Review the DAG for concurrency: which issues share no blockers and can be worked in parallel? Encoding redundant edges (adding `A-1` to every issue when it already chains through `A-2`) collapses the graph and defeats parallelism.
+3. Fetch each issue's `databaseId` (the REST endpoint takes the database ID, not the issue number):
+
+   ```bash
+   gh api graphql -f query='query { repository(owner:"<o>",name:"<r>") { issue(number:<N>) { databaseId } } }'
+   ```
+
+4. Add each direct blocked-by edge:
+
+   ```bash
+   gh api -X POST repos/<o>/<r>/issues/<N>/dependencies/blocked_by -F issue_id=<blocking_databaseId>
+   ```
+
+5. Verify with `gh api repos/<o>/<r>/issues/<N>/dependencies/blocked_by --jq '[.[] | .number]'`.
+
+Keep the text `## Blocked by` body section in sync with the native Relationships — readers who don't open the panel still need to see the chain.
 
 ## Acceptance Criteria
 
