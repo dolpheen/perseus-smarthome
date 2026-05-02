@@ -37,6 +37,7 @@ agent = [
 
 [project.scripts]
 rpi-io-mcp = "perseus_smarthome.server:main"
+rpi-io-agent = "perseus_smarthome.agent.__main__:main"
 
 [build-system]
 requires = ["hatchling"]
@@ -45,6 +46,7 @@ build-backend = "hatchling.build"
 [dependency-groups]
 dev = [
   "pytest>=8.0",
+  "websockets>=16.0",
 ]
 
 [tool.pytest.ini_options]

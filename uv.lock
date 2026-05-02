@@ -830,6 +830,7 @@ agent = [
 [package.dev-dependencies]
 dev = [
     { name = "pytest" },
+    { name = "websockets" },
 ]
 
 [package.metadata]
@@ -844,7 +845,10 @@ requires-dist = [
 provides-extras = ["agent"]
 
 [package.metadata.requires-dev]
-dev = [{ name = "pytest", specifier = ">=8.0" }]
+dev = [
+    { name = "pytest", specifier = ">=8.0" },
+    { name = "websockets", specifier = ">=16.0" },
+]
 
 [[package]]
 name = "pluggy"
