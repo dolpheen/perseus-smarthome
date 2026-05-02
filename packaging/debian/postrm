@@ -7,6 +7,7 @@ case "$1" in
   purge)
     systemctl daemon-reload || true
     rm -rf /opt/raspberry-smarthome
+    rm -rf /etc/perseus-smarthome
     if getent passwd perseus-smarthome >/dev/null; then
       deluser --system perseus-smarthome >/dev/null 2>&1 || true
     fi

@@ -1,0 +1,26 @@
+[Unit]
+Description=Raspberry Pi Smart Home Agent Chat Service
+After=network.target rpi-io-mcp.service
+Wants=rpi-io-mcp.service
+
+[Service]
+Type=simple
+User=perseus-smarthome
+Group=perseus-smarthome
+WorkingDirectory=/opt/raspberry-smarthome
+# Agent reads LLM_API_KEY and chat listen address from agent.env.
+# The leading '-' means the unit starts in degraded mode if the file is
+# missing — llm_unconfigured is surfaced on the first WebSocket turn.
+EnvironmentFile=-/etc/perseus-smarthome/agent.env
+ExecStart=/opt/raspberry-smarthome/.venv/bin/rpi-io-agent
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=10
+# systemd manages /var/lib/perseus-smarthome (aliases.json, agent-memory.db).
+StateDirectory=perseus-smarthome
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=rpi-io-agent
+
+[Install]
+WantedBy=multi-user.target

@@ -17,14 +17,20 @@ case "$1" in
     else
       chown -R perseus-smarthome:perseus-smarthome /opt/raspberry-smarthome
     fi
+    # Ensure /etc/perseus-smarthome/ exists so the operator can drop agent.env.
+    install -d -m 0755 /etc/perseus-smarthome
     systemctl daemon-reload
     if [ -z "$2" ]; then
       # First install: enable and start together.
       systemctl enable --now rpi-io-mcp.service
+      systemctl enable --now rpi-io-agent.service
     elif systemctl is-active --quiet rpi-io-mcp.service; then
       # Upgrade: restart only if already running; preserve the admin's
       # enabled/disabled choice.
       systemctl restart rpi-io-mcp.service
+      if systemctl is-active --quiet rpi-io-agent.service; then
+        systemctl restart rpi-io-agent.service
+      fi
     fi
     ;;
 esac

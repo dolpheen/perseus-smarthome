@@ -2,6 +2,12 @@
 set -e
 case "$1" in
   remove|deconfigure)
+    if systemctl is-active --quiet rpi-io-agent.service; then
+      systemctl stop rpi-io-agent.service
+    fi
+    if systemctl is-enabled --quiet rpi-io-agent.service; then
+      systemctl disable rpi-io-agent.service
+    fi
     if systemctl is-active --quiet rpi-io-mcp.service; then
       systemctl stop rpi-io-mcp.service
     fi
@@ -12,6 +18,9 @@ case "$1" in
   upgrade)
     # On upgrade: stop only; do not disable so the admin's choice is
     # preserved across the upgrade.
+    if systemctl is-active --quiet rpi-io-agent.service; then
+      systemctl stop rpi-io-agent.service
+    fi
     if systemctl is-active --quiet rpi-io-mcp.service; then
       systemctl stop rpi-io-mcp.service
     fi
