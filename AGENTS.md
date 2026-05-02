@@ -187,6 +187,9 @@ Prefer small, concrete issues:
 - Explicit inputs, outputs, and edge cases.
 - Explicit verification command.
 - Links to the relevant spec requirement IDs.
+- Direct blockers populated as native GitHub Issue Dependencies (the Issues UI's `Blocked by` panel), in addition to a text `## Blocked by` section in the body. See `docs/agent-pr-workflow.md` for the API recipe.
+
+When opening a batch of issues for a milestone phase, derive the dependency DAG from `tasks.md` "Dependency Order" and review it for concurrency before populating relationships. Encode only direct edges — transitive blockers fall out of the graph. Issues whose blockers are disjoint can be picked up in parallel by separate agents or worktrees, so a flat blocked-by list defeats the purpose.
 
 Avoid broad issues:
 
