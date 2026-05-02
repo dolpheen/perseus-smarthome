@@ -130,18 +130,20 @@ rsync -az --delete \
 # 2. SSH into the Pi
 ssh pi@raspberrypi.local
 
-# 3. On the Pi: create service user if missing
+# 3. On the Pi: create the install directory first (service user home must exist)
+sudo mkdir -p /opt/raspberry-smarthome
+
+# 4. On the Pi: create service user if missing
 sudo adduser --system --group --home /opt/raspberry-smarthome \
   --shell /usr/sbin/nologin --no-create-home perseus-smarthome
 sudo usermod -aG gpio perseus-smarthome
-sudo chown -R perseus-smarthome:gpio /opt/raspberry-smarthome
 
-# 4. On the Pi: install dependencies (run as your SSH user who has uv)
+# 5. On the Pi: install dependencies (run as your SSH user who has uv)
 cd /opt/raspberry-smarthome
 uv sync --no-dev
 sudo chown -R perseus-smarthome:gpio /opt/raspberry-smarthome
 
-# 5. On the Pi: install the systemd unit (User=perseus-smarthome is already set)
+# 6. On the Pi: install the systemd unit (User=perseus-smarthome is already set)
 sudo cp deploy/systemd/rpi-io-mcp.service /etc/systemd/system/rpi-io-mcp.service
 sudo systemctl daemon-reload
 sudo systemctl enable rpi-io-mcp.service

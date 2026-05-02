@@ -208,11 +208,11 @@ Idempotent. Each step is a check-then-act:
    are missing (checked via `dpkg -s`).
 3. **uv.** If `uv` is not on PATH for the deploy user, install via the
    upstream installer into `~/.local/bin`. Skip if present.
-4. **Service user.** Create the `perseus-smarthome` system user if it does
-   not already exist (`adduser --system --group --home
-   /opt/raspberry-smarthome --shell /usr/sbin/nologin --no-create-home
-   perseus-smarthome`). Add it to the `gpio` group if not already a member.
-   This step is idempotent.
+4. **Service user.** Create the install directory if it does not exist, then
+   create the `perseus-smarthome` system user if it does not already exist
+   (`adduser --system --group --home /opt/raspberry-smarthome --shell
+   /usr/sbin/nologin --no-create-home perseus-smarthome`). Add it to the
+   `gpio` group if not already a member. This step is idempotent.
 5. **Stage source.** Detect whether the script is running inside a checkout
    (typical when invoked locally) or whether the source has been rsynced to
    `/opt/raspberry-smarthome` already (typical when invoked by

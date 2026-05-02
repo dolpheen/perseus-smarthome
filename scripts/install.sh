@@ -153,12 +153,14 @@ cmd_install() {
   fi
 
   # Step 4: Create service user and add to gpio (DEP-FR-005)
+  # Create the install dir first so the service user's home directory exists
+  # when adduser records it in /etc/passwd.
+  mkdir -p "${INSTALL_DIR}"
   log "Ensuring ${SERVICE_USER} system user"
   ensure_service_user
 
   # Step 5: Stage source (DEP-FR-006)
   log "Staging source to ${INSTALL_DIR}"
-  mkdir -p "${INSTALL_DIR}"
 
   # Determine source: if we're already inside INSTALL_DIR, skip the copy.
   local canonical_install
