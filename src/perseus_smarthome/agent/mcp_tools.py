@@ -37,6 +37,8 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from mcp import ClientSession
 
+from perseus_smarthome.agent.rate_limit import OutputRateLimiter
+
 # Callable type alias: (tool_name, args) -> structured result dict
 CallTool = Callable[[str, dict[str, Any]], Awaitable[dict[str, Any]]]
 
@@ -75,6 +77,7 @@ class RpiIOMCPTools:
     def __init__(self, call_tool: CallTool) -> None:
         self._call_tool = call_tool
         self._known_device_ids: set[str] | None = None
+        self._rate_limiter: OutputRateLimiter | None = None
 
     # ------------------------------------------------------------------
     # Public tool methods
@@ -85,23 +88,32 @@ class RpiIOMCPTools:
 
         Caches the returned device IDs so that subsequent :meth:`set_output`
         and :meth:`read_input` calls can validate them locally before
-        reaching the MCP server (AGENT-FR-007).
+        reaching the MCP server (AGENT-FR-007).  Also initialises the
+        per-device rate limiter from the ``rate_limit`` field.
         """
         result = await self._call_tool("list_devices", {})
         self._known_device_ids = {d["id"] for d in result.get("devices", [])}
+        self._rate_limiter = OutputRateLimiter.from_list_devices_result(result)
         return result
 
     async def set_output(self, device_id: str, value: int) -> dict[str, Any]:
         """Wrap MCP ``set_output``.
 
         Refuses unknown ``device_id`` values before calling the MCP server
-        (AGENT-FR-007).  Translates ``ok=False`` results to
-        :exc:`MCPToolError` (AGENT-FR-008).
+        (AGENT-FR-007).  Serializes calls per device through an
+        :class:`~perseus_smarthome.agent.rate_limit.OutputRateLimiter` and
+        enforces the minimum inter-toggle interval from ``list_devices``.
+        Translates ``ok=False`` results to :exc:`MCPToolError`
+        (AGENT-FR-008).
         """
         await self._require_known_device(device_id)
-        result = await self._call_tool(
-            "set_output", {"device_id": device_id, "value": value}
-        )
+        # _rate_limiter is guaranteed non-None after _require_known_device
+        # (list_devices always sets both _known_device_ids and _rate_limiter).
+        assert self._rate_limiter is not None
+        async with self._rate_limiter.guard(device_id):
+            result = await self._call_tool(
+                "set_output", {"device_id": device_id, "value": value}
+            )
         if not result.get("ok"):
             raise MCPToolError._from_result(result)
         return result
