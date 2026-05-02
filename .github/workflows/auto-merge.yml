@@ -171,7 +171,18 @@ jobs:
             echo "merge=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          has_next=$(jq -r '.data.repository.pullRequest.reviewThreads.pageInfo.hasNextPage // true' <<<"$threads_json")
+          # jq's `//` alternative operator treats both `null` AND `false` as
+          # missing, so `.hasNextPage // true` returns `"true"` even when the
+          # API plainly says `false`. That misfired the gate on every PR
+          # (every reviewThreads response has hasNextPage:false in the common
+          # case). Read the literal value and only fail-closed when it is
+          # neither true nor false.
+          has_next=$(jq -r '.data.repository.pullRequest.reviewThreads.pageInfo.hasNextPage' <<<"$threads_json")
+          if [[ "$has_next" != "true" && "$has_next" != "false" ]]; then
+            echo "reviewThreads.pageInfo.hasNextPage was '$has_next' (expected true/false); failing closed"
+            echo "merge=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
           if [[ "$has_next" == "true" ]]; then
             echo "PR has more than 100 review threads; failing closed (raise the first:N cap or paginate)"
             echo "merge=false" >> "$GITHUB_OUTPUT"
