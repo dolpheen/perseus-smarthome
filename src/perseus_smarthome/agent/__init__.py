@@ -1,1 +1,1 @@
-"""Perseus smart home agent package (Milestone 2 / Phase A)."""
+"""Agent layer for Perseus Smarthome (Milestone 2)."""

@@ -23,6 +23,7 @@ def _default_config_path() -> Path:
 _SUPPORTED_NUMBERING = {"BCM"}
 _SUPPORTED_DEVICE_KINDS = {"output", "input"}
 _REQUIRED_DEVICE_FIELDS = ("id", "name", "kind", "pin")
+_DEFAULT_OUTPUT_MIN_INTERVAL_MS = 250
 
 
 class ConfigError(Exception):
@@ -80,3 +81,23 @@ def _validate(data: dict[str, Any]) -> None:
         if device_id in seen_ids:
             raise ConfigError(f"Duplicate device ID '{device_id}'.")
         seen_ids.add(device_id)
+
+
+def get_rate_limit_ms(config: dict[str, Any]) -> int:
+    """Return output_min_interval_ms from [rate_limit] or the 250 ms default.
+
+    Raises ConfigError when the value is present but not a non-negative
+    integer (booleans are rejected).
+    """
+    raw = config.get("rate_limit", {}).get(
+        "output_min_interval_ms", _DEFAULT_OUTPUT_MIN_INTERVAL_MS
+    )
+    if isinstance(raw, bool) or not isinstance(raw, int):
+        raise ConfigError(
+            f"[rate_limit].output_min_interval_ms must be a non-negative integer, got {raw!r}."
+        )
+    if raw < 0:
+        raise ConfigError(
+            f"[rate_limit].output_min_interval_ms must be >= 0, got {raw!r}."
+        )
+    return raw
