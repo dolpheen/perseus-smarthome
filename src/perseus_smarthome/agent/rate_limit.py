@@ -50,7 +50,15 @@ class OutputRateLimiter:
                 _DEFAULT_INTERVAL_MS,
             )
             return cls(_DEFAULT_INTERVAL_MS)
-        return cls(rate_limit.get("output_min_interval_ms", _DEFAULT_INTERVAL_MS))
+        interval_ms = rate_limit.get("output_min_interval_ms")
+        if interval_ms is None:
+            _log.warning(
+                "list_devices rate_limit missing 'output_min_interval_ms' key; "
+                "falling back to %d ms inter-toggle interval.",
+                _DEFAULT_INTERVAL_MS,
+            )
+            interval_ms = _DEFAULT_INTERVAL_MS
+        return cls(interval_ms)
 
     def _get_lock(self, device_id: str) -> asyncio.Lock:
         if device_id not in self._locks:

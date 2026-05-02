@@ -109,7 +109,9 @@ class RpiIOMCPTools:
         await self._require_known_device(device_id)
         # _rate_limiter is guaranteed non-None after _require_known_device
         # (list_devices always sets both _known_device_ids and _rate_limiter).
-        assert self._rate_limiter is not None
+        assert self._rate_limiter is not None, (  # noqa: S101
+            "_rate_limiter must be initialised by list_devices before set_output"
+        )
         async with self._rate_limiter.guard(device_id):
             result = await self._call_tool(
                 "set_output", {"device_id": device_id, "value": value}
