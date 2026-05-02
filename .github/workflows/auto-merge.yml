@@ -5,16 +5,22 @@ on:
     types: [opened, reopened, synchronize, ready_for_review, labeled, unlabeled]
   pull_request_review:
     types: [submitted]
-  # Re-evaluate when a maintainer marks a Copilot review thread Resolved (or
-  # un-resolves one). Without this trigger the new copilot-pull-request-reviewer
-  # gate added in PR #40 would leave PRs stuck after thread resolution: none of
-  # the other events fire on resolve, and `workflow_run` for CI only re-runs on
-  # a fresh push.
-  pull_request_review_thread:
-    types: [resolved, unresolved]
   workflow_run:
     workflows: ["CI"]
     types: [completed]
+  # Manual re-trigger after a maintainer resolves a Copilot review thread.
+  # GitHub Actions does not support `pull_request_review_thread` as a workflow
+  # trigger (it exists only as a webhook event); the prior config tried it and
+  # failed schema validation, which silently disabled the entire workflow for
+  # all PRs. With no thread-resolution event available, the supported way to
+  # re-evaluate auto-merge after marking Copilot threads Resolved is one of:
+  # add/remove a label, push an empty commit, or run this workflow manually.
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: 'PR number to re-evaluate'
+        required: true
+        type: string
 
 permissions:
   pull-requests: write
@@ -25,14 +31,16 @@ permissions:
   actions: read
 
 concurrency:
-  # All trigger types resolve to a head ref: pull_request* and
-  # pull_request_review_thread carry pull_request.head.ref; workflow_run
-  # carries workflow_run.head_branch. Using either keeps every auto-merge
-  # job for the same PR in the same group regardless of which event fired
-  # it, avoiding the prior split where workflow_run used head_sha and
-  # pull_request* used the PR number — two runs for the same PR could race
-  # in parallel, last-writer-wins.
-  group: auto-merge-${{ github.event.pull_request.head.ref || github.event.workflow_run.head_branch }}
+  # All trigger types resolve to a head ref: pull_request* events carry
+  # pull_request.head.ref, workflow_run carries workflow_run.head_branch,
+  # workflow_dispatch carries inputs.pr_number (which we map to a branch via
+  # the Resolve PR number step below; for grouping, the PR number alone is a
+  # stable key). Using one of these keeps every auto-merge job for the same
+  # PR in the same group regardless of which event fired it, avoiding the
+  # prior split where workflow_run used head_sha and pull_request* used the
+  # PR number — two runs for the same PR could race in parallel, last-
+  # writer-wins.
+  group: auto-merge-${{ github.event.pull_request.head.ref || github.event.workflow_run.head_branch || github.event.inputs.pr_number }}
   cancel-in-progress: false
 
 jobs:
@@ -47,7 +55,7 @@ jobs:
         run: |
           set -euo pipefail
           case "${{ github.event_name }}" in
-            pull_request|pull_request_review|pull_request_review_thread)
+            pull_request|pull_request_review)
               echo "number=${{ github.event.pull_request.number }}" >> "$GITHUB_OUTPUT"
               ;;
             workflow_run)
@@ -59,6 +67,9 @@ jobs:
               sha="${{ github.event.workflow_run.head_sha }}"
               num=$(gh api "repos/$REPO/commits/$sha/pulls" --jq '.[] | select(.state=="open") | .number' | head -1)
               echo "number=${num:-}" >> "$GITHUB_OUTPUT"
+              ;;
+            workflow_dispatch)
+              echo "number=${{ github.event.inputs.pr_number }}" >> "$GITHUB_OUTPUT"
               ;;
           esac
 
