@@ -174,24 +174,33 @@ def test_list_devices_refresh_preserves_interval_enforcement() -> None:
 
 
 def test_list_devices_refresh_preserves_same_lock_object() -> None:
-    """After a list_devices refresh the same OutputRateLimiter instance is reused."""
+    """After a list_devices refresh the same OutputRateLimiter instance is reused,
+    and the per-device asyncio.Lock objects inside it are the same objects."""
 
     async def recording_call(name: str, args: dict[str, Any]) -> dict[str, Any]:
         if name == "list_devices":
             return _make_result(_DEVICES, _TEST_INTERVAL_MS)
         return {"device_id": args["device_id"], "value": args["value"], "ok": True}
 
-    async def run() -> tuple[object, object]:
+    async def run() -> tuple[object, object, object, object]:
         tools = RpiIOMCPTools(recording_call)
         await tools.list_devices()
+        # Force a lock entry to be created for the output device.
+        assert tools._rate_limiter is not None
+        lock_before = tools._rate_limiter._get_lock("gpio23_output")
         limiter_before = tools._rate_limiter
+        # Refresh.
         await tools.list_devices()
         limiter_after = tools._rate_limiter
-        return limiter_before, limiter_after
+        lock_after = tools._rate_limiter._get_lock("gpio23_output")
+        return limiter_before, limiter_after, lock_before, lock_after
 
-    before, after = asyncio.run(run())
+    before, after, lock_b, lock_a = asyncio.run(run())
     assert before is after, (
         "list_devices refresh must reuse the existing OutputRateLimiter instance"
+    )
+    assert lock_b is lock_a, (
+        "Per-device asyncio.Lock must be the same object after list_devices refresh"
     )
 
 
