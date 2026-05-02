@@ -66,7 +66,19 @@ if [ "${canonical_rendered}" != "${packaged_content}" ]; then
   diff <(echo "${canonical_rendered}") <(echo "${packaged_content}") >&2 || true
   exit 1
 fi
-echo "==> Drift check passed: packaged unit matches canonical unit."
+echo "==> Drift check passed: packaged MCP unit matches canonical unit."
+
+# Drift check for the agent unit.  Both the canonical and packaged copies
+# already use User=perseus-smarthome, so a plain diff is sufficient.
+CANONICAL_AGENT_UNIT="${REPO_ROOT}/deploy/systemd/rpi-io-agent.service"
+PACKAGED_AGENT_UNIT="${SCRIPT_DIR}/debian/perseus-smarthome-agent.service"
+
+if [ "$(cat "${CANONICAL_AGENT_UNIT}")" != "$(cat "${PACKAGED_AGENT_UNIT}")" ]; then
+  echo "ERROR: packaging/debian/perseus-smarthome-agent.service has drifted from deploy/systemd/rpi-io-agent.service." >&2
+  diff "${CANONICAL_AGENT_UNIT}" "${PACKAGED_AGENT_UNIT}" >&2 || true
+  exit 1
+fi
+echo "==> Drift check passed: packaged agent unit matches canonical unit."
 
 # ---------------------------------------------------------------------------
 # 4. Verify apt dependencies can be resolved on the build host
@@ -136,8 +148,9 @@ rsync -a --delete \
   --exclude='dist' \
   "${REPO_ROOT}/" "${BUILD_DIR}/opt/raspberry-smarthome/"
 
-# Stage the packaged systemd unit (already drift-checked above)
+# Stage the packaged systemd units (already drift-checked above)
 cp "${PACKAGED_UNIT}" "${BUILD_DIR}/etc/systemd/system/rpi-io-mcp.service"
+cp "${PACKAGED_AGENT_UNIT}" "${BUILD_DIR}/etc/systemd/system/rpi-io-agent.service"
 
 # ---------------------------------------------------------------------------
 # 7. Build the virtualenv into the staged tree

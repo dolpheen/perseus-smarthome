@@ -26,6 +26,9 @@ source "${SCRIPT_DIR}/lib.sh"
 INSTALL_DIR="/opt/raspberry-smarthome"
 UNIT_SRC="${INSTALL_DIR}/deploy/systemd/rpi-io-mcp.service"
 UNIT_DST="/etc/systemd/system/rpi-io-mcp.service"
+AGENT_UNIT_SRC="${INSTALL_DIR}/deploy/systemd/rpi-io-agent.service"
+AGENT_UNIT_DST="/etc/systemd/system/rpi-io-agent.service"
+AGENT_SERVICE="rpi-io-agent.service"
 APT_PREREQS=(libffi-dev python3-dev build-essential swig liblgpio-dev)
 SERVICE="rpi-io-mcp.service"
 SERVICE_USER="perseus-smarthome"
@@ -89,12 +92,14 @@ ensure_service_user() {
   fi
 }
 
-# wait_active [timeout_seconds] → waits until the service is active.
+# wait_active [service] [timeout_seconds] → waits until the named service is active.
+# If service is omitted, defaults to ${SERVICE} (rpi-io-mcp.service).
 wait_active() {
-  local timeout="${1:-30}"
+  local svc="${1:-${SERVICE}}"
+  local timeout="${2:-30}"
   local elapsed=0
   while [[ "${elapsed}" -lt "${timeout}" ]]; do
-    if systemctl is-active --quiet "${SERVICE}" 2>/dev/null; then
+    if systemctl is-active --quiet "${svc}" 2>/dev/null; then
       return 0
     fi
     sleep 2
@@ -202,26 +207,39 @@ cmd_install() {
   chown -R "${SERVICE_USER}:gpio" "${INSTALL_DIR}" \
     || die "chown to ${SERVICE_USER}:gpio failed on ${INSTALL_DIR}."
 
-  # Step 7: Install systemd unit (User=perseus-smarthome is already in the file)
+  # Step 7: Install systemd units (User=perseus-smarthome is already in both files)
   log "Installing systemd unit"
   if [[ ! -f "${UNIT_SRC}" ]]; then
     die "Unit source file not found: ${UNIT_SRC}. Ensure the source was staged correctly."
   fi
   cp "${UNIT_SRC}" "${UNIT_DST}" \
     || die "Failed to write ${UNIT_DST}."
+  if [[ ! -f "${AGENT_UNIT_SRC}" ]]; then
+    die "Agent unit source file not found: ${AGENT_UNIT_SRC}. Ensure the source was staged correctly."
+  fi
+  cp "${AGENT_UNIT_SRC}" "${AGENT_UNIT_DST}" \
+    || die "Failed to write ${AGENT_UNIT_DST}."
 
-  # Step 8: Activate (DEP-FR-006)
+  # Step 8: Activate (DEP-FR-006, AGENT-FR-009)
   log "Running systemctl daemon-reload"
   systemctl daemon-reload || die "systemctl daemon-reload failed."
   log "Enabling and starting ${SERVICE}"
   systemctl enable --now "${SERVICE}" || die "systemctl enable --now ${SERVICE} failed."
+  log "Enabling and starting ${AGENT_SERVICE}"
+  systemctl enable --now "${AGENT_SERVICE}" || die "systemctl enable --now ${AGENT_SERVICE} failed."
 
   # Step 9: Verify
-  log "Waiting for service to become active (up to 30 s)"
-  if wait_active 30; then
-    log "Service is active"
+  log "Waiting for ${SERVICE} to become active (up to 30 s)"
+  if wait_active "${SERVICE}" 30; then
+    log "${SERVICE} is active"
   else
-    log "WARNING: Service did not become active within 30 s. Check: journalctl -u ${SERVICE}"
+    log "WARNING: ${SERVICE} did not become active within 30 s. Check: journalctl -u ${SERVICE}"
+  fi
+  log "Waiting for ${AGENT_SERVICE} to become active (up to 30 s)"
+  if wait_active "${AGENT_SERVICE}" 30; then
+    log "${AGENT_SERVICE} is active"
+  else
+    log "WARNING: ${AGENT_SERVICE} did not become active within 30 s. Check: journalctl -u ${AGENT_SERVICE}"
   fi
 
   cmd_status
@@ -292,24 +310,33 @@ cmd_upgrade() {
   chown -R "${SERVICE_USER}:gpio" "${INSTALL_DIR}" \
     || die "chown to ${SERVICE_USER}:gpio failed on ${INSTALL_DIR}."
 
-  # Step 7: Reinstall systemd unit (User=perseus-smarthome is already in the file)
-  log "Installing systemd unit"
+  # Step 7: Reinstall systemd units (User=perseus-smarthome is already in both files)
+  log "Installing systemd units"
   if [[ ! -f "${UNIT_SRC}" ]]; then
     die "Unit source file not found: ${UNIT_SRC}. The staged source may be incomplete — re-run install."
   fi
   cp "${UNIT_SRC}" "${UNIT_DST}" \
     || die "Failed to write ${UNIT_DST}."
+  if [[ ! -f "${AGENT_UNIT_SRC}" ]]; then
+    die "Agent unit source file not found: ${AGENT_UNIT_SRC}. The staged source may be incomplete — re-run install."
+  fi
+  cp "${AGENT_UNIT_SRC}" "${AGENT_UNIT_DST}" \
+    || die "Failed to write ${AGENT_UNIT_DST}."
 
   # Reload and restart
   log "Reloading systemd and restarting ${SERVICE}"
   systemctl daemon-reload || die "systemctl daemon-reload failed."
   systemctl restart "${SERVICE}" || die "systemctl restart ${SERVICE} failed."
+  if systemctl is-active --quiet "${AGENT_SERVICE}" 2>/dev/null; then
+    log "Restarting ${AGENT_SERVICE}"
+    systemctl restart "${AGENT_SERVICE}" || die "systemctl restart ${AGENT_SERVICE} failed."
+  fi
 
-  log "Waiting for service to become active (up to 30 s)"
-  if wait_active 30; then
-    log "Service is active"
+  log "Waiting for ${SERVICE} to become active (up to 30 s)"
+  if wait_active "${SERVICE}" 30; then
+    log "${SERVICE} is active"
   else
-    log "WARNING: Service did not become active within 30 s. Check: journalctl -u ${SERVICE}"
+    log "WARNING: ${SERVICE} did not become active within 30 s. Check: journalctl -u ${SERVICE}"
   fi
 
   cmd_status
@@ -337,14 +364,20 @@ cmd_uninstall() {
   require_root
 
   # Step 1: stop (ignore "not loaded")
+  log "Stopping ${AGENT_SERVICE}"
+  systemctl stop "${AGENT_SERVICE}" 2>/dev/null || true
   log "Stopping ${SERVICE}"
   systemctl stop "${SERVICE}" 2>/dev/null || true
 
   # Step 2: disable (ignore "not enabled")
+  log "Disabling ${AGENT_SERVICE}"
+  systemctl disable "${AGENT_SERVICE}" 2>/dev/null || true
   log "Disabling ${SERVICE}"
   systemctl disable "${SERVICE}" 2>/dev/null || true
 
-  # Step 3: remove unit file
+  # Step 3: remove unit files
+  log "Removing ${AGENT_UNIT_DST}"
+  rm -f "${AGENT_UNIT_DST}"
   log "Removing ${UNIT_DST}"
   rm -f "${UNIT_DST}"
 
@@ -403,6 +436,12 @@ cmd_status() {
   else
     echo "reachable: (curl not available)"
   fi
+
+  echo "--- rpi-io-agent status ---"
+  is_active="$(systemctl is-active "${AGENT_SERVICE}" 2>/dev/null || echo "inactive")"
+  is_enabled="$(systemctl is-enabled "${AGENT_SERVICE}" 2>/dev/null || echo "disabled")"
+  echo "active:  ${is_active}"
+  echo "enabled: ${is_enabled}"
 
   echo "-------------------------"
 }
