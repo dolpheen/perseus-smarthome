@@ -5,8 +5,10 @@ Reads configuration from environment variables (loaded from
 
   AGENT_CHAT_HOST    default 0.0.0.0
   AGENT_CHAT_PORT    default 8765
-  LLM_API_KEY        required for live LLM; service starts in degraded mode
-                     when absent (see factory._UnconfiguredAgent).
+  OPENROUTER_API_KEY preferred for the default OpenRouter live LLM
+  OPENAI_API_KEY     accepted for OpenAI-compatible providers
+                     (legacy LLM_API_KEY is also accepted). Service starts in
+                     degraded mode when no provider key is present.
 
 Spec: AGENT-FR-001, AGENT-FR-002, AGENT-FR-003
 Design: specs/features/llm-agent/design.md  "Deployment"

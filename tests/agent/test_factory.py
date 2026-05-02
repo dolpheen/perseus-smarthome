@@ -110,28 +110,37 @@ if _AGENT_DEPS:
 # ---------------------------------------------------------------------------
 
 
-def test_create_agent_returns_unconfigured_when_key_is_unset(
+def _clear_provider_keys(monkeypatch: pytest.MonkeyPatch) -> None:
+    for key in ("OPENROUTER_API_KEY", "OPENAI_API_KEY", "LLM_API_KEY"):
+        monkeypatch.delenv(key, raising=False)
+
+
+def test_create_agent_returns_unconfigured_when_provider_keys_are_unset(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """create_agent() must return _UnconfiguredAgent when LLM_API_KEY is absent."""
-    monkeypatch.delenv("LLM_API_KEY", raising=False)
+    """create_agent() must return _UnconfiguredAgent when provider keys are absent."""
+    _clear_provider_keys(monkeypatch)
     agent = create_agent()
     assert isinstance(agent, _UnconfiguredAgent)
 
 
-def test_create_agent_returns_unconfigured_when_key_is_empty(
+def test_create_agent_returns_unconfigured_when_provider_keys_are_empty(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """create_agent() must return _UnconfiguredAgent when LLM_API_KEY is empty."""
+    """create_agent() must return _UnconfiguredAgent when provider keys are empty."""
+    monkeypatch.setenv("OPENROUTER_API_KEY", "")
+    monkeypatch.setenv("OPENAI_API_KEY", "")
     monkeypatch.setenv("LLM_API_KEY", "")
     agent = create_agent()
     assert isinstance(agent, _UnconfiguredAgent)
 
 
-def test_create_agent_returns_unconfigured_when_key_is_whitespace_only(
+def test_create_agent_returns_unconfigured_when_provider_keys_are_whitespace_only(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Whitespace-only LLM_API_KEY is treated as unset."""
+    """Whitespace-only provider keys are treated as unset."""
+    monkeypatch.setenv("OPENROUTER_API_KEY", " ")
+    monkeypatch.setenv("OPENAI_API_KEY", "\t")
     monkeypatch.setenv("LLM_API_KEY", "   ")
     agent = create_agent()
     assert isinstance(agent, _UnconfiguredAgent)
@@ -160,21 +169,27 @@ def test_unconfigured_agent_callable_returns_same_as_invoke() -> None:
 def test_unconfigured_error_does_not_contain_api_key(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """_UnconfiguredAgent response must not echo LLM_API_KEY from the environment.
+    """_UnconfiguredAgent response must not echo provider keys from the environment.
 
-    Sets a recognisable sentinel AS LLM_API_KEY so that any code path reading
+    Sets recognisable sentinels so that any code path reading
     the env var and including it in the response would be caught.
 
     Spec: AGENT-FR-010 — credential must never appear in logs or error messages.
     """
-    secret = "super-secret-key-xyz"
-    monkeypatch.setenv("LLM_API_KEY", secret)
+    secrets = {
+        "OPENROUTER_API_KEY": "or-secret-key-xyz",
+        "OPENAI_API_KEY": "openai-secret-key-xyz",
+        "LLM_API_KEY": "legacy-secret-key-xyz",
+    }
+    for key, secret in secrets.items():
+        monkeypatch.setenv(key, secret)
     agent = _UnconfiguredAgent()
     result = agent.invoke({"messages": []})
     for value in result.values():
-        assert secret not in str(value), (
-            f"LLM_API_KEY value leaked into error output: {value!r}"
-        )
+        for key, secret in secrets.items():
+            assert secret not in str(value), (
+                f"{key} value leaked into error output: {value!r}"
+            )
 
 
 def test_create_agent_does_not_raise_on_import_with_no_key(
@@ -184,7 +199,7 @@ def test_create_agent_does_not_raise_on_import_with_no_key(
 
     Spec: AGENT-FR-011 — service must start in degraded mode without exiting.
     """
-    monkeypatch.delenv("LLM_API_KEY", raising=False)
+    _clear_provider_keys(monkeypatch)
     agent = create_agent()
     assert agent is not None
 
@@ -330,7 +345,9 @@ def test_init_chat_model_receives_correct_provider_url_and_key(
     Verifies model_provider="openai", correct base_url, correct model name,
     and that the api_key is passed through — but never logged (AGENT-FR-010).
     """
-    monkeypatch.setenv("LLM_API_KEY", "test-key-abc123")
+    monkeypatch.setenv("OPENROUTER_API_KEY", "test-key-abc123")
+    monkeypatch.setenv("OPENAI_API_KEY", "wrong-key")
+    monkeypatch.setenv("LLM_API_KEY", "legacy-key")
     monkeypatch.setenv("LLM_API_BASE_URL", "https://openrouter.ai/api/v1")
     monkeypatch.setenv("LLM_MODEL", "test-model/name")
 
@@ -351,11 +368,51 @@ def test_init_chat_model_receives_correct_provider_url_and_key(
 
 
 @_skip_without_agent_deps
+def test_init_chat_model_falls_back_to_openai_api_key(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """OPENAI_API_KEY is accepted when OPENROUTER_API_KEY is absent."""
+    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
+    monkeypatch.setenv("OPENAI_API_KEY", "openai-compatible-key")
+    monkeypatch.setenv("LLM_API_KEY", "legacy-key")
+
+    stub = _make_stub(AIMessage(content="Done."))
+
+    with patch(
+        "langchain.chat_models.init_chat_model", return_value=stub
+    ) as mock_init:
+        create_agent(tools=_PHASE_A_NOOP_TOOLS)
+
+    assert mock_init.call_args.kwargs["api_key"] == "openai-compatible-key"
+
+
+@_skip_without_agent_deps
+def test_init_chat_model_falls_back_to_legacy_llm_api_key(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """LLM_API_KEY remains a deprecated compatibility fallback."""
+    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.setenv("LLM_API_KEY", "legacy-key")
+
+    stub = _make_stub(AIMessage(content="Done."))
+
+    with patch(
+        "langchain.chat_models.init_chat_model", return_value=stub
+    ) as mock_init:
+        create_agent(tools=_PHASE_A_NOOP_TOOLS)
+
+    assert mock_init.call_args.kwargs["api_key"] == "legacy-key"
+
+
+@_skip_without_agent_deps
 def test_init_chat_model_uses_default_env_values(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """When LLM_MODEL / LLM_API_BASE_URL are unset, documented defaults are used."""
-    monkeypatch.setenv("LLM_API_KEY", "some-key")
+    monkeypatch.setenv("OPENROUTER_API_KEY", "some-key")
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.delenv("LLM_API_KEY", raising=False)
     monkeypatch.delenv("LLM_API_BASE_URL", raising=False)
     monkeypatch.delenv("LLM_MODEL", raising=False)
 
@@ -377,8 +434,8 @@ def test_init_chat_model_uses_default_env_values(
 def test_create_agent_with_injected_model_bypasses_init_chat_model(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """When model= is supplied, create_agent uses it regardless of LLM_API_KEY."""
-    monkeypatch.delenv("LLM_API_KEY", raising=False)
+    """When model= is supplied, create_agent uses it regardless of provider keys."""
+    _clear_provider_keys(monkeypatch)
     stub = _make_stub(AIMessage(content="Hello."))
     agent = create_agent(model=stub, tools=_PHASE_A_NOOP_TOOLS)
     # Injected model → real agent, not degraded.

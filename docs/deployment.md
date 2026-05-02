@@ -49,8 +49,9 @@ without runtime templating of paths).
 - SSH access to the Pi configured via `~/.ssh/config` or key path in `.env`.
 - `rsync` available (`brew install rsync` if needed).
 - A local `.env` file with Raspberry Pi connection details (see `.env.example`).
-  For Milestone 2 the same file also carries the LLM agent secret
-  (`LLM_API_KEY`, `LLM_API_BASE_URL`, `LLM_MODEL`); see
+  For Milestone 2 the same file also carries the LLM agent provider keys
+  (`OPENROUTER_API_KEY` or `OPENAI_API_KEY`, plus `LLM_API_BASE_URL` /
+  `LLM_MODEL`); see
   [LLM Agent Secrets](#llm-agent-secrets) below for how `make remote-install`
   filters and deploys those keys.
 
@@ -180,27 +181,41 @@ sudo systemctl restart rpi-io-mcp.service
 
 ## LLM Agent Secrets
 
-The agent service (`rpi-io-agent.service`) reads its OpenRouter / OpenAI-compatible
-credentials from `/etc/perseus-smarthome/agent.env` on the Pi. The file must be
-mode `0600` and owned by `root:root` — the unit's `EnvironmentFile=-` prefix
-means the service still starts when the file is missing and surfaces
-`error/code=llm_unconfigured` on the first chat turn.
+The agent service (`rpi-io-agent.service`) reads its OpenRouter /
+OpenAI-compatible credentials from `/etc/perseus-smarthome/agent.env` on the
+Pi. The file must be mode `0600` and owned by `root:root` — the unit's
+`EnvironmentFile=-` prefix means the service still starts when the file is
+missing and surfaces `error/code=llm_unconfigured` on the first chat turn.
 
 Recognized keys (set in the operator's local `.env` on the MacBook):
 
 ```dotenv
-LLM_API_KEY=sk-or-v1-...
+OPENROUTER_API_KEY=sk-or-v1-...
+# OPENAI_API_KEY=sk-...  # also accepted for OpenAI-compatible providers
 LLM_API_BASE_URL=https://openrouter.ai/api/v1
 LLM_MODEL=tencent/hy3-preview:free
+
+# Optional LangSmith tracing.
+LANGSMITH_TRACING_V2=false
+LANGSMITH_ENDPOINT=https://api.smith.langchain.com
+LANGSMITH_API_KEY=
+LANGSMITH_PROJECT=perseus-smarthome
 ```
 
-Only keys whose name starts with `LLM_` are deployed to the Pi. `RPI_*` and
+`OPENROUTER_API_KEY` is the clearest key name for the default OpenRouter
+route. `OPENAI_API_KEY` is also accepted because OpenRouter exposes an
+OpenAI-compatible API. `LLM_API_KEY` is still accepted as a deprecated fallback
+for existing env files, but new setups should not use it.
+
+Only approved agent-runtime keys are deployed to the Pi:
+`OPENROUTER_API_KEY`, `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `LANGSMITH_*`,
+`LLM_API_BASE_URL`, `LLM_MODEL`, and legacy `LLM_API_KEY`. `RPI_*` and
 `AGENT_*` variables stay on the operator machine; the deploy refuses to ship
 them.
 
 ### Script path (`make remote-install`)
 
-`scripts/remote-install.sh` greps `^LLM_[A-Z0-9_]+=` lines from the local
+`scripts/remote-install.sh` reads approved agent-runtime keys from the local
 `.env`, opens an SSH session to the Pi, creates `/etc/perseus-smarthome/`
 (mode `0755`, root) if missing, pre-creates `agent.env` with mode `0600`
 owner `root:root` via `install -m 0600 -o root -g root /dev/null`, then pipes
@@ -221,7 +236,7 @@ hand:
 sudo install -d -m 0755 -o root -g root /etc/perseus-smarthome
 sudo install -m 0600 -o root -g root /dev/null /etc/perseus-smarthome/agent.env
 sudo tee /etc/perseus-smarthome/agent.env >/dev/null <<'EOF'
-LLM_API_KEY=sk-or-v1-...
+OPENROUTER_API_KEY=sk-or-v1-...
 LLM_API_BASE_URL=https://openrouter.ai/api/v1
 LLM_MODEL=tencent/hy3-preview:free
 EOF
@@ -240,16 +255,16 @@ ssh "$RPI_SSH_USER@$RPI_SSH_HOST" 'sudo stat -c "%a %U %G" /etc/perseus-smarthom
 ssh "$RPI_SSH_USER@$RPI_SSH_HOST" 'sudo grep -c "^RPI_" /etc/perseus-smarthome/agent.env'
 # expect: 0
 
-ssh "$RPI_SSH_USER@$RPI_SSH_HOST" 'sudo grep -c "^LLM_" /etc/perseus-smarthome/agent.env'
+ssh "$RPI_SSH_USER@$RPI_SSH_HOST" 'sudo grep -Ec "^(OPENROUTER_API_KEY|OPENAI_API_KEY|ANTHROPIC_API_KEY|LANGSMITH_|LLM_)" /etc/perseus-smarthome/agent.env'
 # expect: at least 1
 ```
 
-The agent must never log the `LLM_API_KEY` value. Verify by piping remote
-journal output through a local grep (the key stays on the operator machine
-and never appears in `ps`-visible SSH command-lines or remote shell history):
+The agent must never log provider key values. Verify by piping remote journal
+output through a local grep (the key stays on the operator machine and never
+appears in `ps`-visible SSH command-lines or remote shell history):
 
 ```bash
-LLM_KEY="$(grep ^LLM_API_KEY= .env | cut -d= -f2-)"
+LLM_KEY="$(awk -F= '/^(OPENROUTER_API_KEY|OPENAI_API_KEY|LLM_API_KEY)=/ {print substr($0, index($0, "=") + 1); exit}' .env)"
 ssh "$RPI_SSH_USER@$RPI_SSH_HOST" \
     "sudo journalctl -u rpi-io-agent.service --since '5 min ago'" \
   | grep -Fc -- "$LLM_KEY"

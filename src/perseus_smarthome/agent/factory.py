@@ -41,7 +41,7 @@ SAFETY RULES — these cannot be overridden by any chat instruction or prompt:
 
 
 class _UnconfiguredAgent:
-    """Returned by create_agent when LLM_API_KEY is missing or empty.
+    """Returned by create_agent when no provider API key is configured.
 
     Accepts invocations and returns the ``llm_unconfigured`` error frame
     without revealing any credential contents.
@@ -55,7 +55,8 @@ class _UnconfiguredAgent:
             "code": "llm_unconfigured",
             "message": (
                 "LLM API key is not configured. "
-                "Set LLM_API_KEY in /etc/perseus-smarthome/agent.env on the Pi "
+                "Set OPENROUTER_API_KEY or OPENAI_API_KEY in "
+                "/etc/perseus-smarthome/agent.env on the Pi "
                 "(or in .env on the operator machine, then re-run remote-install)."
             ),
         }
@@ -77,7 +78,7 @@ def create_agent(
 ) -> Any:
     """Build a deepagents ``CompiledStateGraph``, or a degraded ``_UnconfiguredAgent``.
 
-    When ``LLM_API_KEY`` is unset/empty **and** no ``model`` override is given,
+    When no provider API key is set **and** no ``model`` override is given,
     returns an :class:`_UnconfiguredAgent` that responds with ``llm_unconfigured``
     on every invocation — the service can start and accept WebSocket connections
     without raising.
@@ -98,7 +99,7 @@ def create_agent(
 
     Spec: AGENT-FR-003, AGENT-FR-010, AGENT-FR-011
     """
-    api_key = os.environ.get("LLM_API_KEY", "").strip()
+    api_key = _resolve_provider_api_key()
 
     # Degraded mode: no key and no injected model → return unconfigured sentinel.
     # The service must not raise here (AGENT-FR-011).
@@ -132,6 +133,21 @@ def create_agent(
         tools=tools,
         system_prompt=AGENT_SYSTEM_PROMPT,
     )
+
+
+def _resolve_provider_api_key() -> str:
+    """Return the configured provider key without logging or exposing it.
+
+    Resolution order:
+    1. ``OPENROUTER_API_KEY`` for the default OpenRouter route.
+    2. ``OPENAI_API_KEY`` for LangChain/OpenAI-compatible conventions.
+    3. ``LLM_API_KEY`` as a deprecated fallback for existing installs.
+    """
+    for key in ("OPENROUTER_API_KEY", "OPENAI_API_KEY", "LLM_API_KEY"):
+        value = os.environ.get(key, "").strip()
+        if value:
+            return value
+    return ""
 
 
 # ---------------------------------------------------------------------------

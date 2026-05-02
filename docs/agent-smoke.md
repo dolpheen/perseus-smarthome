@@ -36,7 +36,9 @@ The four checks below cover the Phase A acceptance criteria from
   (`systemctl is-active rpi-io-mcp.service rpi-io-agent.service` returns
   `active` twice).
 - `/etc/perseus-smarthome/agent.env` exists with mode `0600` owner
-  `root:root` and contains a working `LLM_API_KEY` (live-LLM smoke only).
+  `root:root` and contains a working `OPENROUTER_API_KEY` or
+  `OPENAI_API_KEY` (live-LLM smoke only; legacy `LLM_API_KEY` is still
+  accepted).
   See [LLM Agent Secrets](deployment.md#llm-agent-secrets).
 - Operator's MacBook is on the same trusted LAN as the Pi.
 - `<pi>` below is the Pi's hostname or IP — substitute throughout.
@@ -148,7 +150,8 @@ after 2026-05-08:
   endpoint (or set `model_provider="anthropic"` in the agent factory and
   drop `base_url` for native Anthropic).
 - Re-run `make remote-install` to redeploy `/etc/perseus-smarthome/agent.env`
-  with the new values.
+  with the new values (`OPENROUTER_API_KEY` for OpenRouter, or
+  `OPENAI_API_KEY` for another OpenAI-compatible endpoint).
 - Note the swap in the Phase A closeout PR's Change Log so the milestone
   history captures which model actually gated acceptance.
 

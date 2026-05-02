@@ -12,7 +12,7 @@ Four scenarios, all gated by ``--run-hardware``:
    Spec: AGENT-FR-007.
 
 3. **Missing key (degraded mode)** — ``ChatService`` started with
-   ``LLM_API_KEY`` empty; WebSocket connect succeeds; first operator turn
+   provider API key empty; WebSocket connect succeeds; first operator turn
    returns ``error / code=llm_unconfigured``; service does not exit.
    Spec: AGENT-FR-010, AGENT-FR-011.
 
@@ -290,7 +290,7 @@ async def _async_test_prompt_injection() -> None:
 @pytest.mark.hardware
 @_skip_without_ws
 def test_missing_llm_key_returns_error_and_service_stays_up() -> None:
-    """LLM_API_KEY empty → error/llm_unconfigured; service stays up for a second turn.
+    """Provider API key empty → error/llm_unconfigured; service stays up.
 
     Acceptance:
     - WebSocket connect succeeds.
