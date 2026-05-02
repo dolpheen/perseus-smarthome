@@ -815,11 +815,15 @@ name = "perseus-smarthome"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
-    { name = "deepagents" },
     { name = "gpiozero" },
-    { name = "langchain-openai" },
     { name = "lgpio", marker = "platform_machine in 'armv6l armv7l aarch64' and sys_platform == 'linux'" },
     { name = "mcp" },
+]
+
+[package.optional-dependencies]
+agent = [
+    { name = "deepagents" },
+    { name = "langchain-openai" },
     { name = "websockets" },
 ]
 
@@ -830,13 +834,14 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "deepagents", specifier = ">=0.5.6" },
+    { name = "deepagents", marker = "extra == 'agent'", specifier = ">=0.5.6" },
     { name = "gpiozero", specifier = ">=2.0" },
-    { name = "langchain-openai", specifier = ">=1.2.1" },
+    { name = "langchain-openai", marker = "extra == 'agent'", specifier = ">=1.2.1" },
     { name = "lgpio", marker = "platform_machine in 'armv6l armv7l aarch64' and sys_platform == 'linux'", specifier = ">=0.2" },
     { name = "mcp", specifier = ">=1.0,<2" },
-    { name = "websockets", specifier = ">=16.0" },
+    { name = "websockets", marker = "extra == 'agent'", specifier = ">=16.0" },
 ]
+provides-extras = ["agent"]
 
 [package.metadata.requires-dev]
 dev = [{ name = "pytest", specifier = ">=8.0" }]

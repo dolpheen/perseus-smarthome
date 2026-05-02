@@ -20,5 +20,5 @@ def pytest_addoption(parser: pytest.Parser) -> None:
         "--run-llm",
         action="store_true",
         default=False,
-        help="Run @pytest.mark.llm tests (requires a real LLM provider key).",
+        help="Run @pytest.mark.llm tests (skipped by default; set LLM_API_KEY in .env for real calls).",
     )
