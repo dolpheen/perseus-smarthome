@@ -179,9 +179,13 @@ def test_same_device_interval_is_enforced() -> None:
 
     assert len(call_times) == 2
     gap_ms = (call_times[1] - call_times[0]) * 1000
-    # Allow 10 ms tolerance for scheduling overhead.
+    # Allow 10 ms tolerance for scheduling overhead; upper bound rules out
+    # broken sleep calculations or accidental deadlocks.
     assert gap_ms >= _TEST_INTERVAL_MS - 10, (
         f"Inter-toggle gap {gap_ms:.1f} ms < {_TEST_INTERVAL_MS} ms"
+    )
+    assert gap_ms < _TEST_INTERVAL_MS + 200, (
+        f"Inter-toggle gap {gap_ms:.1f} ms far exceeded {_TEST_INTERVAL_MS} ms"
     )
 
 
