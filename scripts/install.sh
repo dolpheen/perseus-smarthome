@@ -437,6 +437,12 @@ cmd_status() {
     echo "reachable: (curl not available)"
   fi
 
+  echo "--- rpi-io-agent status ---"
+  is_active="$(systemctl is-active "${AGENT_SERVICE}" 2>/dev/null || echo "inactive")"
+  is_enabled="$(systemctl is-enabled "${AGENT_SERVICE}" 2>/dev/null || echo "disabled")"
+  echo "active:  ${is_active}"
+  echo "enabled: ${is_enabled}"
+
   echo "-------------------------"
 }
 
