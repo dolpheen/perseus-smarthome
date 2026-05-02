@@ -76,21 +76,24 @@ These resolve the Open Questions in `requirements.md`:
 
 ### 1. Service user
 
-The script-install path runs the service as the deploy user (continuing
-Milestone 1 behavior). The `.deb` path creates a dedicated system user
-`perseus-smarthome` (UID dynamic, home `/opt/raspberry-smarthome`, shell
-`/usr/sbin/nologin`) in `postinst`. Both users are added to the `gpio`
-group.
+**Revised (LLM-A-0, 2026-05-02).** Both install paths run the service as
+`User=perseus-smarthome`. The script path creates the `perseus-smarthome`
+system user at install time (`adduser --system --group --home
+/opt/raspberry-smarthome --shell /usr/sbin/nologin --no-create-home
+perseus-smarthome`; then `usermod -aG gpio perseus-smarthome`; then
+`chown -R perseus-smarthome:gpio /opt/raspberry-smarthome`), mirroring the
+deb `postinst`. The deb path is unchanged.
 
-This divergence is intentional and documented:
+The original "divergent by design" rationale (Milestone 1 compatibility) no
+longer applies: Phase A of Milestone 2 requires a single, documented ownership
+model for `/var/lib/perseus-smarthome/` (agent alias store and long-term
+memory). Standardizing on `perseus-smarthome` provides that model without
+complicating either install path.
 
-- The script path is the natural fit for a single-operator Pi. It avoids
-  creating an extra account and matches the verified Milestone 1 setup.
-- The `.deb` path follows Debian convention (a service-specific system
-  user) so apt installs behave like every other system service on the box.
-
-The two paths should not be mixed on the same Pi (see Cross-Path Coexistence
-below).
+The canonical unit file (`deploy/systemd/rpi-io-mcp.service`) now contains
+`User=perseus-smarthome` as its permanent value; the `sed` rewrite at step 7
+of the script install is dropped. Operators upgrading from an existing
+script-install must run `make remote-install` once to migrate.
 
 ### 2. systemd `ExecStart`
 
@@ -205,21 +208,27 @@ Idempotent. Each step is a check-then-act:
    are missing (checked via `dpkg -s`).
 3. **uv.** If `uv` is not on PATH for the deploy user, install via the
    upstream installer into `~/.local/bin`. Skip if present.
-4. **gpio group.** If the deploy user is not in `gpio`, run `usermod -aG
-   gpio <user>` and warn that re-login or reboot is required.
+4. **Service user.** Create the install directory if it does not exist, then
+   create the `perseus-smarthome` system user if it does not already exist
+   (`adduser --system --group --home /opt/raspberry-smarthome --shell
+   /usr/sbin/nologin --no-create-home perseus-smarthome`). Add it to the
+   `gpio` group if not already a member. This step is idempotent.
 5. **Stage source.** Detect whether the script is running inside a checkout
    (typical when invoked locally) or whether the source has been rsynced to
    `/opt/raspberry-smarthome` already (typical when invoked by
    `remote-install.sh`). Copy / rsync the source into
-   `/opt/raspberry-smarthome` with `chown -R <user>:gpio`, excluding the
-   same paths the existing deploy script excludes (`.git`, `.env`, `.venv`,
-   `__pycache__`, `*.pyc`, `.pytest_cache`).
-6. **uv sync.** As the deploy user: `cd /opt/raspberry-smarthome && uv sync
-   --no-dev`. The resulting `.venv/bin/rpi-io-mcp` is the systemd
-   ExecStart target.
-7. **Render unit.** `sed "s|^User=pi$|User=<user>|"` of
-   `/opt/raspberry-smarthome/deploy/systemd/rpi-io-mcp.service` into
-   `/etc/systemd/system/rpi-io-mcp.service`.
+   `/opt/raspberry-smarthome` with `chown -R <operator>:gpio` temporarily,
+   so the operator user can write the venv in the next step. After uv sync,
+   `chown -R perseus-smarthome:gpio /opt/raspberry-smarthome` transfers
+   final ownership to the service user. Excludes `.git`, `.env`, `.venv`,
+   `__pycache__`, `*.pyc`, `.pytest_cache`.
+6. **uv sync.** As the operator user (from `SUDO_USER`): `cd
+   /opt/raspberry-smarthome && uv sync --no-dev`. The resulting
+   `.venv/bin/rpi-io-mcp` is the systemd ExecStart target.
+7. **Install unit.** Copy
+   `/opt/raspberry-smarthome/deploy/systemd/rpi-io-mcp.service` to
+   `/etc/systemd/system/rpi-io-mcp.service`. No `User=` rewrite is needed;
+   the canonical unit already contains `User=perseus-smarthome`.
 8. **Activate.** `systemctl daemon-reload && systemctl enable --now
    rpi-io-mcp.service`.
 9. **Verify.** Wait up to 30 seconds for `systemctl is-active` to return
@@ -227,10 +236,11 @@ Idempotent. Each step is a check-then-act:
 
 ### Behavior — `upgrade`
 
-Same as `install` but skips steps 2–4 (apt, uv, gpio) and fails fast if
+Same as `install` but skips steps 2–3 (apt, uv) and fails fast if
 `/opt/raspberry-smarthome` does not exist or `/etc/systemd/system/rpi-io-mcp.service`
-is missing. The user is read from the existing unit file's `User=` line, not
-from `--user`.
+is missing. Step 4 (service user creation) runs to handle migration from old
+installs where the user may not yet exist. The operator user is read from
+`SUDO_USER`; no `--user` flag applies.
 
 ### Behavior — `uninstall`
 
@@ -283,9 +293,9 @@ Steps:
    (port, optional key, `StrictHostKeyChecking=accept-new`).
 3. For `install`/`upgrade`: rsync the working tree to
    `/opt/raspberry-smarthome` on the Pi (same exclude list), then SSH and
-   run `sudo /opt/raspberry-smarthome/scripts/install.sh <subcommand>
-   --user <RPI_SSH_USER>`. The `--user` flag pins the deploy user so the
-   Pi-side default lookup does not surprise.
+   run `sudo /opt/raspberry-smarthome/scripts/install.sh <subcommand>`.
+   No `--user` flag is passed; the service always runs as
+   `User=perseus-smarthome`.
 4. For `uninstall` and `status`: SSH only. No rsync.
 5. Stream remote stdout/stderr to the Mac terminal so the operator sees the
    `==>` log lines as they happen.
@@ -420,10 +430,12 @@ Run on a Pi 2 (armv7l). Steps:
 1. Read version from `pyproject.toml`.
 2. Drift check: assert
    `packaging/debian/perseus-smarthome.service ==
-   deploy/systemd/rpi-io-mcp.service` (post-User-substitution); fail
-   `make deb` if they differ. The packaging copy uses
-   `User=perseus-smarthome` whereas the canonical unit uses `User=pi`, so
-   the comparison is on the rendered form.
+   deploy/systemd/rpi-io-mcp.service`. After LLM-A-0 both files contain
+   `User=perseus-smarthome`, so they are identical; the check applies the
+   same `sed "s|^User=.*|User=perseus-smarthome|"` normalization for
+   forwards compatibility. If the canonical unit gains new fields they
+   must also be applied to the packaged unit, and this check will catch
+   the divergence.
 3. Stage:
 
    ```text
@@ -727,3 +739,11 @@ None blocking. Possible follow-ups for a later iteration:
   resolution). Round-2 deferred findings from PRs #52, #53, and #55 also
   folded into "Decisions Discovered During Implementation". Status
   flipped from Approved to Implemented.
+- 2026-05-02: LLM-A-0. Reversed Resolved Design Decision #1 (service user
+  divergent by design). Both install paths now run the service as
+  `User=perseus-smarthome`. Updated Behavior — install steps 4, 5, 6, 7;
+  updated Behavior — upgrade; updated remote-install.sh step 3; updated
+  drift-check note (both unit files now identical). The `sed` rewrite in
+  step 7 is dropped; the canonical unit permanently carries
+  `User=perseus-smarthome`. The `--user` flag on `install` is a no-op;
+  `remote-install.sh` no longer passes it.

@@ -7,6 +7,9 @@
 #   sudo ./scripts/install.sh uninstall [--purge]
 #        ./scripts/install.sh status
 #
+# The service always runs as User=perseus-smarthome (created at install time).
+# The --user flag is accepted for backwards compatibility but is ignored.
+#
 # Requirements: DEP-FR-001 through DEP-FR-011
 # Design: specs/features/deployment/design.md :: Script: scripts/install.sh
 
@@ -25,41 +28,65 @@ UNIT_SRC="${INSTALL_DIR}/deploy/systemd/rpi-io-mcp.service"
 UNIT_DST="/etc/systemd/system/rpi-io-mcp.service"
 APT_PREREQS=(libffi-dev python3-dev build-essential swig liblgpio-dev)
 SERVICE="rpi-io-mcp.service"
+SERVICE_USER="perseus-smarthome"
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
-# resolve_user [--user <name>] → sets DEPLOY_USER.
-# Priority: --user flag > SUDO_USER env > "pi" default.
+# resolve_user [--user <name>] → sets DEPLOY_USER (operator user for uv operations).
+# --user is accepted for backwards compatibility but the value is ignored; the
+# service always runs as SERVICE_USER (perseus-smarthome) regardless of this flag.
+# Priority for uv operations: SUDO_USER env > "pi" default.
 resolve_user() {
-  local flag_user=""
   while [[ $# -gt 0 ]]; do
     case "$1" in
-      --user) flag_user="${2:?'--user requires a name'}"; shift 2 ;;
+      --user)
+        # Accepted for backwards compatibility; the value is ignored.
+        # Validate that an argument is present so `set -e` gives a clear error.
+        if [[ $# -lt 2 ]]; then
+          die "--user requires a name argument (accepted for backwards compat, value is ignored)"
+        fi
+        shift 2
+        ;;
       *) shift ;;
     esac
   done
 
-  if [[ -n "${flag_user}" ]]; then
-    DEPLOY_USER="${flag_user}"
-  elif [[ -n "${SUDO_USER:-}" ]]; then
+  if [[ -n "${SUDO_USER:-}" ]]; then
     DEPLOY_USER="${SUDO_USER}"
   else
     DEPLOY_USER="pi"
   fi
 
   if ! id "${DEPLOY_USER}" >/dev/null 2>&1; then
-    die "Deploy user '${DEPLOY_USER}' does not exist on this host. Pass --user <name> with a valid account."
+    die "Operator user '${DEPLOY_USER}' does not exist on this host."
   fi
 }
 
-# read_unit_user → reads User= from the installed systemd unit.
-read_unit_user() {
-  local unit_user
-  unit_user="$(grep -E '^User=' "${UNIT_DST}" | head -1 | cut -d= -f2 | tr -d '[:space:]')"
-  if [[ -z "${unit_user}" ]]; then
-    die "Cannot read User= from ${UNIT_DST}. File may be corrupt."
+# ensure_service_user → creates SERVICE_USER system user if missing and adds to gpio.
+# Mirrors packaging/debian/postinst so both install paths share the same user model.
+ensure_service_user() {
+  if ! getent passwd "${SERVICE_USER}" >/dev/null 2>&1; then
+    log "Creating system user ${SERVICE_USER}"
+    adduser --system --group --home "${INSTALL_DIR}" \
+            --shell /usr/sbin/nologin --no-create-home \
+            "${SERVICE_USER}" \
+      || die "Failed to create ${SERVICE_USER} system user."
+  else
+    log "${SERVICE_USER} system user already exists"
   fi
-  echo "${unit_user}"
+
+  # Add to gpio for /dev/gpio* access; fail fast if gpio group is absent —
+  # the unit declares Group=gpio and the later chown :gpio would also fail.
+  if ! getent group gpio >/dev/null 2>&1; then
+    die "gpio group does not exist on this host. Ensure the gpio group is present before installing."
+  fi
+  if ! id -nG "${SERVICE_USER}" | tr ' ' '\n' | grep -Fx gpio >/dev/null 2>&1; then
+    usermod -aG gpio "${SERVICE_USER}" \
+      || die "Failed to add ${SERVICE_USER} to gpio group."
+    log "${SERVICE_USER} added to gpio group"
+  else
+    log "${SERVICE_USER} is already in the gpio group"
+  fi
 }
 
 # wait_active [timeout_seconds] → waits until the service is active.
@@ -86,7 +113,7 @@ cmd_install() {
   # Parse args
   resolve_user "$@"
 
-  log "Starting install (deploy user: ${DEPLOY_USER})"
+  log "Starting install (service user: ${SERVICE_USER}, operator: ${DEPLOY_USER})"
 
   # Cross-path coexistence guard (design.md::Resolved Design Decisions::4):
   # Refuse if the deb-managed package is installed.
@@ -132,19 +159,15 @@ cmd_install() {
     log "uv already installed for ${DEPLOY_USER}"
   fi
 
-  # Step 4: gpio group membership (DEP-FR-005)
-  log "Checking gpio group membership for ${DEPLOY_USER}"
-  if ! id -nG "${DEPLOY_USER}" | grep -qw gpio; then
-    usermod -aG gpio "${DEPLOY_USER}" \
-      || die "Failed to add ${DEPLOY_USER} to gpio group."
-    log "WARNING: ${DEPLOY_USER} was added to the gpio group. A reboot or re-login is required before the service can access GPIO."
-  else
-    log "${DEPLOY_USER} is already in the gpio group"
-  fi
+  # Step 4: Create service user and add to gpio (DEP-FR-005)
+  # Create the install dir first so the service user's home directory exists
+  # when adduser records it in /etc/passwd.
+  mkdir -p "${INSTALL_DIR}"
+  log "Ensuring ${SERVICE_USER} system user"
+  ensure_service_user
 
   # Step 5: Stage source (DEP-FR-006)
   log "Staging source to ${INSTALL_DIR}"
-  mkdir -p "${INSTALL_DIR}"
 
   # Determine source: if we're already inside INSTALL_DIR, skip the copy.
   local canonical_install
@@ -175,13 +198,16 @@ cmd_install() {
     "cd '${INSTALL_DIR}' && uv sync --no-dev" \
     || die "uv sync --no-dev failed. Check the log above for details."
 
-  # Step 7: Render and install systemd unit
-  log "Rendering and installing systemd unit"
+  # Transfer ownership to service user after venv is built (DEP-FR-006).
+  chown -R "${SERVICE_USER}:gpio" "${INSTALL_DIR}" \
+    || die "chown to ${SERVICE_USER}:gpio failed on ${INSTALL_DIR}."
+
+  # Step 7: Install systemd unit (User=perseus-smarthome is already in the file)
+  log "Installing systemd unit"
   if [[ ! -f "${UNIT_SRC}" ]]; then
     die "Unit source file not found: ${UNIT_SRC}. Ensure the source was staged correctly."
   fi
-  sed "s|^User=.*|User=${DEPLOY_USER}|" "${UNIT_SRC}" \
-    > "${UNIT_DST}" \
+  cp "${UNIT_SRC}" "${UNIT_DST}" \
     || die "Failed to write ${UNIT_DST}."
 
   # Step 8: Activate (DEP-FR-006)
@@ -218,9 +244,19 @@ cmd_upgrade() {
     die "No systemd unit at ${UNIT_DST}. Run 'sudo ./scripts/install.sh install' first."
   fi
 
-  # Read deploy user from existing unit (design.md::Behavior — upgrade)
-  DEPLOY_USER="$(read_unit_user)"
-  log "Deploy user from existing unit: ${DEPLOY_USER}"
+  # Determine operator user for uv sync (same logic as install; no --user flag in upgrade).
+  if [[ -n "${SUDO_USER:-}" ]]; then
+    DEPLOY_USER="${SUDO_USER}"
+  else
+    DEPLOY_USER="pi"
+  fi
+  if ! id "${DEPLOY_USER}" >/dev/null 2>&1; then
+    die "Operator user '${DEPLOY_USER}' does not exist on this host."
+  fi
+  log "Operator user: ${DEPLOY_USER}"
+
+  # Ensure service user exists (idempotent; also handles migration from old installs).
+  ensure_service_user
 
   # Step 5: Stage source (same logic as install, skipped if already in place)
   log "Staging source to ${INSTALL_DIR}"
@@ -252,13 +288,16 @@ cmd_upgrade() {
     "cd '${INSTALL_DIR}' && uv sync --no-dev" \
     || die "uv sync --no-dev failed."
 
-  # Step 7: Re-render and reinstall systemd unit
-  log "Rendering and installing systemd unit"
+  # Transfer ownership to service user after venv is built.
+  chown -R "${SERVICE_USER}:gpio" "${INSTALL_DIR}" \
+    || die "chown to ${SERVICE_USER}:gpio failed on ${INSTALL_DIR}."
+
+  # Step 7: Reinstall systemd unit (User=perseus-smarthome is already in the file)
+  log "Installing systemd unit"
   if [[ ! -f "${UNIT_SRC}" ]]; then
     die "Unit source file not found: ${UNIT_SRC}. The staged source may be incomplete — re-run install."
   fi
-  sed "s|^User=.*|User=${DEPLOY_USER}|" "${UNIT_SRC}" \
-    > "${UNIT_DST}" \
+  cp "${UNIT_SRC}" "${UNIT_DST}" \
     || die "Failed to write ${UNIT_DST}."
 
   # Reload and restart
@@ -379,14 +418,15 @@ Usage:
        $0 status
 
 Subcommands:
-  install    Idempotent install of rpi-io-mcp (apt, uv, gpio group, systemd unit).
+  install    Idempotent install of rpi-io-mcp (apt, uv, service user, systemd unit).
   upgrade    Update an existing install in place and restart the service.
   uninstall  Stop/disable the service and remove the systemd unit.
              Pass --purge to also remove ${INSTALL_DIR}.
   status     Print service active/enabled state, version, and reachability.
 
 Options for install:
-  --user <name>  Deploy user (default: \$SUDO_USER, else 'pi').
+  --user <name>  Accepted for backwards compatibility; ignored. The service
+                 always runs as User=${SERVICE_USER}.
 EOF
   exit 1
 }
