@@ -88,12 +88,17 @@ class RpiIOMCPTools:
 
         Caches the returned device IDs so that subsequent :meth:`set_output`
         and :meth:`read_input` calls can validate them locally before
-        reaching the MCP server (AGENT-FR-007).  Also initialises the
-        per-device rate limiter from the ``rate_limit`` field.
+        reaching the MCP server (AGENT-FR-007).  On first call, creates the
+        per-device rate limiter from the ``rate_limit`` field.  On subsequent
+        refreshes, updates only the interval so that existing per-device locks
+        and last-call timestamps are preserved.
         """
         result = await self._call_tool("list_devices", {})
         self._known_device_ids = {d["id"] for d in result.get("devices", [])}
-        self._rate_limiter = OutputRateLimiter.from_list_devices_result(result)
+        if self._rate_limiter is None:
+            self._rate_limiter = OutputRateLimiter.from_list_devices_result(result)
+        else:
+            self._rate_limiter.update_interval_from_list_devices_result(result)
         return result
 
     async def set_output(self, device_id: str, value: int) -> dict[str, Any]:

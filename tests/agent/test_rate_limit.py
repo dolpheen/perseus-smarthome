@@ -123,9 +123,76 @@ def test_missing_rate_limit_field_warning_via_list_devices(
     assert any(r.levelno == logging.WARNING for r in caplog.records)
 
 
+def test_rate_limit_present_but_interval_key_missing_uses_default(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """When rate_limit is present but output_min_interval_ms key is absent, fall back to 250 ms."""
+    result: dict[str, Any] = {"devices": _DEVICES, "rate_limit": {}}  # key absent
+
+    with caplog.at_level(logging.WARNING, logger="perseus_smarthome.agent.rate_limit"):
+        limiter = OutputRateLimiter.from_list_devices_result(result)
+
+    assert limiter._interval_s == _DEFAULT_INTERVAL_MS / 1000.0
+    assert any(r.levelno == logging.WARNING for r in caplog.records)
+    assert str(_DEFAULT_INTERVAL_MS) in caplog.text
+
+
 # ---------------------------------------------------------------------------
-# Same-device calls must serialize with >= output_min_interval_ms between them
+# list_devices refresh preserves per-device lock state
 # ---------------------------------------------------------------------------
+
+
+def test_list_devices_refresh_preserves_interval_enforcement() -> None:
+    """Refreshing list_devices must not reset _last_call; the interval is still enforced."""
+    call_times: list[float] = []
+    call_count = 0
+
+    async def recording_call(name: str, args: dict[str, Any]) -> dict[str, Any]:
+        nonlocal call_count
+        if name == "list_devices":
+            call_count += 1
+            return _make_result(_DEVICES, _TEST_INTERVAL_MS)
+        call_times.append(time.monotonic())
+        return {"device_id": args["device_id"], "value": args["value"], "ok": True}
+
+    async def run() -> None:
+        tools = RpiIOMCPTools(recording_call)
+        # First write to record a _last_call timestamp.
+        await tools.set_output("gpio23_output", 1)
+        # Refresh the device list — must NOT discard the recorded timestamp.
+        await tools.list_devices()
+        # Second write immediately after refresh; should still wait for the interval.
+        await tools.set_output("gpio23_output", 0)
+
+    asyncio.run(run())
+
+    assert len(call_times) == 2, "Expected exactly two set_output calls"
+    gap_ms = (call_times[1] - call_times[0]) * 1000
+    assert gap_ms >= _TEST_INTERVAL_MS - 10, (
+        f"Interval not enforced after list_devices refresh: gap {gap_ms:.1f} ms < {_TEST_INTERVAL_MS} ms"
+    )
+
+
+def test_list_devices_refresh_preserves_same_lock_object() -> None:
+    """After a list_devices refresh the same OutputRateLimiter instance is reused."""
+
+    async def recording_call(name: str, args: dict[str, Any]) -> dict[str, Any]:
+        if name == "list_devices":
+            return _make_result(_DEVICES, _TEST_INTERVAL_MS)
+        return {"device_id": args["device_id"], "value": args["value"], "ok": True}
+
+    async def run() -> tuple[object, object]:
+        tools = RpiIOMCPTools(recording_call)
+        await tools.list_devices()
+        limiter_before = tools._rate_limiter
+        await tools.list_devices()
+        limiter_after = tools._rate_limiter
+        return limiter_before, limiter_after
+
+    before, after = asyncio.run(run())
+    assert before is after, (
+        "list_devices refresh must reuse the existing OutputRateLimiter instance"
+    )
 
 
 def test_same_device_calls_serialize() -> None:

@@ -35,12 +35,12 @@ class OutputRateLimiter:
         self._locks: dict[str, asyncio.Lock] = {}
         self._last_call: dict[str, float] = {}
 
-    @classmethod
-    def from_list_devices_result(cls, result: dict[str, Any]) -> "OutputRateLimiter":
-        """Build from a ``list_devices`` result dict.
+    @staticmethod
+    def _resolve_interval_ms(result: dict[str, Any]) -> int:
+        """Extract ``output_min_interval_ms`` from a ``list_devices`` result.
 
-        If the ``rate_limit`` field is absent (older MCP server), falls back
-        to :data:`_DEFAULT_INTERVAL_MS` ms and logs a startup warning.
+        Logs a warning and returns :data:`_DEFAULT_INTERVAL_MS` when either the
+        ``rate_limit`` field or the ``output_min_interval_ms`` key is absent.
         """
         rate_limit = result.get("rate_limit")
         if rate_limit is None:
@@ -49,7 +49,7 @@ class OutputRateLimiter:
                 "falling back to %d ms inter-toggle interval.",
                 _DEFAULT_INTERVAL_MS,
             )
-            return cls(_DEFAULT_INTERVAL_MS)
+            return _DEFAULT_INTERVAL_MS
         interval_ms = rate_limit.get("output_min_interval_ms")
         if interval_ms is None:
             _log.warning(
@@ -57,8 +57,22 @@ class OutputRateLimiter:
                 "falling back to %d ms inter-toggle interval.",
                 _DEFAULT_INTERVAL_MS,
             )
-            interval_ms = _DEFAULT_INTERVAL_MS
-        return cls(interval_ms)
+            return _DEFAULT_INTERVAL_MS
+        return interval_ms
+
+    @classmethod
+    def from_list_devices_result(cls, result: dict[str, Any]) -> "OutputRateLimiter":
+        """Build from a ``list_devices`` result dict."""
+        return cls(cls._resolve_interval_ms(result))
+
+    def update_interval_from_list_devices_result(self, result: dict[str, Any]) -> None:
+        """Update the inter-toggle interval from a refreshed ``list_devices`` result.
+
+        Preserves all existing per-device locks and last-call timestamps so
+        that an in-flight write is not affected and the interval guard remains
+        intact across device-list refreshes.
+        """
+        self._interval_s = self._resolve_interval_ms(result) / 1000.0
 
     def _get_lock(self, device_id: str) -> asyncio.Lock:
         if device_id not in self._locks:
