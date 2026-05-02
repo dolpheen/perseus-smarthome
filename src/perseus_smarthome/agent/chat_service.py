@@ -10,6 +10,7 @@ Design: specs/features/llm-agent/design.md
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import json
 import logging
 from pathlib import Path
@@ -66,7 +67,7 @@ def _event_to_frame(event: dict[str, Any]) -> dict[str, Any] | None:
             else:
                 result = content if isinstance(content, dict) else {}
         elif isinstance(raw, dict):
-            result = raw
+            result = dict(raw)  # copy: avoid mutating the original event payload
         else:
             result = {}
         ok = result.pop("ok", True) if isinstance(result, dict) else True
@@ -206,10 +207,22 @@ class ChatService:
                     )
                     continue
 
+                if not isinstance(msg, dict):
+                    await ws.send(
+                        json.dumps(
+                            {
+                                "type": "error",
+                                "code": "invalid_frame",
+                                "message": "Expected a JSON object.",
+                            }
+                        )
+                    )
+                    continue
+
                 if msg.get("type") == "user_turn":
                     await self._run_turn(agent, msg.get("content", ""), ws)
         except Exception:
-            pass
+            log.exception("Unexpected error in WebSocket connection handler")
         finally:
             async with self._lock:
                 if self._current_ws is ws:
@@ -249,12 +262,26 @@ class ChatService:
             # Fallback for test stubs that don't need langchain.
             input_state = {"messages": [{"role": "user", "content": content}]}
 
-        async for event in agent.astream_events(input_state, version="v2"):
-            frame = _event_to_frame(event)
-            if frame is not None:
-                await ws.send(json.dumps(frame))
-
-        await ws.send(json.dumps({"type": "agent_done"}))
+        try:
+            async for event in agent.astream_events(input_state, version="v2"):
+                frame = _event_to_frame(event)
+                if frame is not None:
+                    await ws.send(json.dumps(frame))
+        except Exception:
+            log.exception("Error during agent streaming")
+            with contextlib.suppress(Exception):
+                await ws.send(
+                    json.dumps(
+                        {
+                            "type": "error",
+                            "code": "agent_error",
+                            "message": "An unexpected error occurred.",
+                        }
+                    )
+                )
+        finally:
+            with contextlib.suppress(Exception):
+                await ws.send(json.dumps({"type": "agent_done"}))
 
     # ------------------------------------------------------------------
     # Server lifecycle

@@ -41,7 +41,7 @@ except ImportError:
 
 _skip_without_ws = pytest.mark.skipif(
     not _WS_AVAILABLE,
-    reason="requires [agent] extras (websockets)",
+    reason="requires websockets (dev dependency group)",
 )
 
 # Import the module under test only when websockets is present (avoids
@@ -160,6 +160,28 @@ async def _collect_turn(ws: Any, timeout: float = 5.0) -> list[dict[str, Any]]:
         if frame.get("type") == "agent_done":
             break
     return frames
+
+
+async def _wait_for_session(
+    service: "ChatService", timeout: float = 2.0
+) -> None:
+    """Poll until *service._current_ws* is set (server accepted the connection)."""
+    deadline = asyncio.get_event_loop().time() + timeout
+    while asyncio.get_event_loop().time() < deadline:
+        if service._current_ws is not None:
+            return
+        await asyncio.sleep(0.001)
+
+
+async def _wait_for_session_change(
+    service: "ChatService", old_ws: Any, timeout: float = 2.0
+) -> None:
+    """Poll until *service._current_ws* changes from *old_ws*."""
+    deadline = asyncio.get_event_loop().time() + timeout
+    while asyncio.get_event_loop().time() < deadline:
+        if service._current_ws is not old_ws:
+            return
+        await asyncio.sleep(0.001)
 
 
 # ---------------------------------------------------------------------------
@@ -400,14 +422,16 @@ def test_session_superseded_prior_receives_error() -> None:
 
 
 async def _async_test_superseded() -> None:
-    async with _running_service(_noop_factory()) as (_, port):
+    async with _running_service(_noop_factory()) as (service, port):
         async with ws_connect(f"ws://127.0.0.1:{port}/chat") as ws1:
-            # Let the server register ws1 as current.
-            await asyncio.sleep(0.05)
+            # Poll until the server has registered ws1 as the current session.
+            await _wait_for_session(service)
+            old_ws = service._current_ws
 
             # ws2 takes the session.
             async with ws_connect(f"ws://127.0.0.1:{port}/chat") as ws2:
-                await asyncio.sleep(0.05)
+                # Poll until the server swaps in ws2.
+                await _wait_for_session_change(service, old_ws)
 
                 # ws1 should have received the superseded error frame.
                 try:
@@ -443,12 +467,13 @@ async def _async_test_new_session_active() -> None:
     def fresh_factory() -> _StubAgent:
         return _StubAgent([events])
 
-    async with _running_service(fresh_factory) as (_, port):
+    async with _running_service(fresh_factory) as (service, port):
         async with ws_connect(f"ws://127.0.0.1:{port}/chat") as ws1:
-            await asyncio.sleep(0.05)
+            await _wait_for_session(service)
+            old_ws = service._current_ws
 
             async with ws_connect(f"ws://127.0.0.1:{port}/chat") as ws2:
-                await asyncio.sleep(0.05)
+                await _wait_for_session_change(service, old_ws)
 
                 # Drain the superseded frame from ws1.
                 try:

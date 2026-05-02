@@ -29,8 +29,16 @@ def main() -> None:
     )
 
     # Lazy import: websockets and deepagents live in [agent] extras.
-    from perseus_smarthome.agent.chat_service import ChatService
-    from perseus_smarthome.agent.factory import create_agent
+    try:
+        from perseus_smarthome.agent.chat_service import ChatService
+        from perseus_smarthome.agent.factory import create_agent
+    except ImportError as exc:
+        print(
+            f"Missing dependencies: {exc}\n"
+            "Install the [agent] extras with:  uv sync --extra agent",
+            file=sys.stderr,
+        )
+        sys.exit(1)
 
     host = os.environ.get("AGENT_CHAT_HOST", "0.0.0.0")
     port = int(os.environ.get("AGENT_CHAT_PORT", "8765"))

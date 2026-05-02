@@ -154,7 +154,7 @@
   </form>
 
   <script>
-    const wsUrl = "ws://" + location.host + "/chat";
+    const wsUrl = (location.protocol === "https:" ? "wss:" : "ws:") + "//" + location.host + "/chat";
     const transcript = document.getElementById("transcript");
     const statusEl  = document.getElementById("status");
     const form      = document.getElementById("form");
@@ -162,7 +162,10 @@
     const sendBtn   = document.getElementById("send-btn");
 
     let ws;
-    let pendingToolCall = null; // holds the last tool_call frame until tool_result arrives
+    // Pending tool_call frames keyed by tool name, in arrival order.
+    // Each entry is {callFrame, el} so we can pair each result with the
+    // correct call even when the same tool is invoked multiple times per turn.
+    const pendingToolCalls = new Map(); // name → [{callFrame, el}, ...]
 
     function setStatus(text, color) {
       statusEl.textContent = text;
@@ -232,26 +235,26 @@
           appendMsg(makeDiv("msg-agent", frame.content));
 
         } else if (frame.type === "tool_call") {
-          // Hold the call frame; we'll pair it with the result in a collapsible.
-          pendingToolCall = frame;
-          // Show immediately as pending.
+          // Insert a pending placeholder and track it in the per-name queue.
           const el = makeToolFrame(frame, null);
           el.dataset.toolName = frame.name;
           appendMsg(el);
+          if (!pendingToolCalls.has(frame.name)) pendingToolCalls.set(frame.name, []);
+          pendingToolCalls.get(frame.name).push({ callFrame: frame, el });
 
         } else if (frame.type === "tool_result") {
-          // Find the matching pending tool call element and update it.
-          const prev = transcript.querySelector(
-            'details[data-tool-name="' + frame.name + '"]:last-of-type'
-          );
-          if (prev) {
-            const newEl = makeToolFrame(pendingToolCall || { name: frame.name, args: {} }, frame);
-            newEl.dataset.toolName = frame.name;
-            prev.replaceWith(newEl);
+          // Dequeue the oldest pending call with this tool name and replace it.
+          const queue = pendingToolCalls.get(frame.name) || [];
+          const entry = queue.shift();
+          if (queue.length === 0) pendingToolCalls.delete(frame.name);
+          const callFrame = entry ? entry.callFrame : { name: frame.name, args: {} };
+          const newEl = makeToolFrame(callFrame, frame);
+          newEl.dataset.toolName = frame.name;
+          if (entry) {
+            entry.el.replaceWith(newEl);
           } else {
-            appendMsg(makeToolFrame({ name: frame.name, args: {} }, frame));
+            appendMsg(newEl);
           }
-          pendingToolCall = null;
 
         } else if (frame.type === "agent_done") {
           // Turn complete; re-enable input for the next message.
