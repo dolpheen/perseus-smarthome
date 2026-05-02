@@ -103,10 +103,12 @@ tool contract, the GPIO behavior, or the trusted-LAN security posture.
   This mirrors the behavior of `packaging/debian/postinst` so both install
   paths share the same service-user model.
 - DEP-FR-006: `scripts/install.sh install` must stage the project under
-  `/opt/raspberry-smarthome` with ownership `perseus-smarthome:gpio`, run
-  `uv sync --no-dev`, install the systemd unit (already contains
-  `User=perseus-smarthome`) to `/etc/systemd/system/rpi-io-mcp.service`, run
-  `systemctl daemon-reload`, and `systemctl enable --now rpi-io-mcp.service`.
+  `/opt/raspberry-smarthome`, run `uv sync --no-dev` as the operator user
+  (using temporary operator:gpio ownership so the operator can write the venv),
+  then transfer final ownership to `perseus-smarthome:gpio`. It must then
+  install the systemd unit (already contains `User=perseus-smarthome`) to
+  `/etc/systemd/system/rpi-io-mcp.service`, run `systemctl daemon-reload`,
+  and `systemctl enable --now rpi-io-mcp.service`.
 - DEP-FR-007: `scripts/install.sh upgrade` must update an existing install in
   place without changing the deploy user, then restart the service. It must
   fail clearly if no install is detected.

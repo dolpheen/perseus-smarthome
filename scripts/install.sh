@@ -39,7 +39,14 @@ SERVICE_USER="perseus-smarthome"
 resolve_user() {
   while [[ $# -gt 0 ]]; do
     case "$1" in
-      --user) shift 2 ;;  # accepted for backwards compat; value is ignored
+      --user)
+        # Accepted for backwards compatibility; the value is ignored.
+        # Validate that an argument is present so `set -e` gives a clear error.
+        if [[ $# -lt 2 ]]; then
+          die "--user requires a name argument (accepted for backwards compat, value is ignored)"
+        fi
+        shift 2
+        ;;
       *) shift ;;
     esac
   done
@@ -68,17 +75,17 @@ ensure_service_user() {
     log "${SERVICE_USER} system user already exists"
   fi
 
-  # Add to gpio for /dev/gpio* access; gracefully handle missing gpio group.
-  if getent group gpio >/dev/null 2>&1; then
-    if ! id -nG "${SERVICE_USER}" | tr ' ' '\n' | grep -Fx gpio >/dev/null 2>&1; then
-      usermod -aG gpio "${SERVICE_USER}" \
-        || die "Failed to add ${SERVICE_USER} to gpio group."
-      log "${SERVICE_USER} added to gpio group"
-    else
-      log "${SERVICE_USER} is already in the gpio group"
-    fi
+  # Add to gpio for /dev/gpio* access; fail fast if gpio group is absent —
+  # the unit declares Group=gpio and the later chown :gpio would also fail.
+  if ! getent group gpio >/dev/null 2>&1; then
+    die "gpio group does not exist on this host. Ensure the gpio group is present before installing."
+  fi
+  if ! id -nG "${SERVICE_USER}" | tr ' ' '\n' | grep -Fx gpio >/dev/null 2>&1; then
+    usermod -aG gpio "${SERVICE_USER}" \
+      || die "Failed to add ${SERVICE_USER} to gpio group."
+    log "${SERVICE_USER} added to gpio group"
   else
-    log "WARNING: gpio group does not exist; ${SERVICE_USER} was not added to gpio"
+    log "${SERVICE_USER} is already in the gpio group"
   fi
 }
 
