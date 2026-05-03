@@ -23,6 +23,7 @@ import pytest
 
 from perseus_smarthome.agent.factory import (
     AGENT_SYSTEM_PROMPT,
+    _build_default_tools,
     _UnconfiguredAgent,
     create_agent,
 )
@@ -440,3 +441,133 @@ def test_create_agent_with_injected_model_bypasses_init_chat_model(
     agent = create_agent(model=stub, tools=_PHASE_A_NOOP_TOOLS)
     # Injected model → real agent, not degraded.
     assert isinstance(agent, CompiledStateGraph)
+
+
+# ---------------------------------------------------------------------------
+# Regression: _build_default_tools must share state across calls
+# ---------------------------------------------------------------------------
+#
+# Before the fix, each @tool wrapper inside _build_default_tools opened a
+# fresh streamable-HTTP MCP session AND instantiated a brand-new
+# RpiIOMCPTools.from_session(session) per call.  That rebuilt the
+# OutputRateLimiter with empty _locks/_last_call on every set_output, so
+# the per-device asyncio.Lock and 250 ms inter-toggle interval mandated by
+# Resolved Decision #7 / AGENT-FR-007 never serialised anything across
+# calls in production, and every set_output triggered a fresh lazy
+# list_devices (mcp_tools.py: lazy device-cache init).
+#
+# These tests inject a fake call_tool through the new optional kwarg so
+# no real MCP server is needed.  They verify the shared rate limiter and
+# device cache by exercising the wrappers end-to-end — they fail on the
+# unmodified factory (where each wrapper builds its own RpiIOMCPTools)
+# and pass after the fix.
+
+
+@_skip_without_agent_deps
+def test_build_default_tools_shares_device_cache_across_set_output_calls() -> None:
+    """Two set_output calls through the wrappers must trigger list_devices once.
+
+    Before the fix, each wrapper rebuilt RpiIOMCPTools so the lazy device
+    cache was empty on every set_output, causing a duplicate list_devices
+    round-trip per write.
+    """
+    import asyncio  # noqa: PLC0415
+
+    call_log: list[str] = []
+    devices = [
+        {
+            "id": "gpio23_output",
+            "name": "GPIO23 Output",
+            "kind": "output",
+            "capabilities": ["set_output"],
+            "state": 0,
+        }
+    ]
+
+    async def fake_call(name: str, args: dict[str, Any]) -> dict[str, Any]:
+        call_log.append(name)
+        if name == "list_devices":
+            return {
+                "devices": devices,
+                "rate_limit": {"output_min_interval_ms": 100},
+            }
+        if name == "set_output":
+            return {
+                "ok": True,
+                "device_id": args["device_id"],
+                "value": args["value"],
+            }
+        raise AssertionError(f"unexpected tool: {name}")
+
+    tools = _build_default_tools("http://x", call_tool=fake_call)
+    by_name = {t.name: t for t in tools}
+
+    async def run() -> None:
+        await by_name["set_output"].ainvoke({"device_id": "gpio23_output", "value": 1})
+        await by_name["set_output"].ainvoke({"device_id": "gpio23_output", "value": 0})
+
+    asyncio.run(run())
+
+    list_devices_calls = [n for n in call_log if n == "list_devices"]
+    assert len(list_devices_calls) == 1, (
+        f"Expected exactly one list_devices round-trip "
+        f"(shared device cache); got {len(list_devices_calls)}: {call_log!r}"
+    )
+
+
+@_skip_without_agent_deps
+def test_build_default_tools_shares_rate_limiter_across_set_output_calls() -> None:
+    """Two back-to-back set_output calls through the wrappers must be separated
+    by at least the announced inter-toggle interval.
+
+    Before the fix, each wrapper rebuilt the OutputRateLimiter so _last_call
+    was always empty and the per-device interval guard never fired.
+    """
+    import asyncio  # noqa: PLC0415
+    import time  # noqa: PLC0415
+
+    interval_ms = 100
+    set_output_times: list[float] = []
+    devices = [
+        {
+            "id": "gpio23_output",
+            "name": "GPIO23 Output",
+            "kind": "output",
+            "capabilities": ["set_output"],
+            "state": 0,
+        }
+    ]
+
+    async def fake_call(name: str, args: dict[str, Any]) -> dict[str, Any]:
+        if name == "list_devices":
+            return {
+                "devices": devices,
+                "rate_limit": {"output_min_interval_ms": interval_ms},
+            }
+        if name == "set_output":
+            set_output_times.append(time.monotonic())
+            return {
+                "ok": True,
+                "device_id": args["device_id"],
+                "value": args["value"],
+            }
+        raise AssertionError(f"unexpected tool: {name}")
+
+    tools = _build_default_tools("http://x", call_tool=fake_call)
+    by_name = {t.name: t for t in tools}
+
+    async def run() -> None:
+        await by_name["set_output"].ainvoke({"device_id": "gpio23_output", "value": 1})
+        await by_name["set_output"].ainvoke({"device_id": "gpio23_output", "value": 0})
+
+    asyncio.run(run())
+
+    assert len(set_output_times) == 2, (
+        f"Expected exactly two set_output calls; got {len(set_output_times)}"
+    )
+    gap_ms = (set_output_times[1] - set_output_times[0]) * 1000
+    # Allow 10 ms tolerance for scheduling jitter.
+    assert gap_ms >= interval_ms - 10, (
+        f"Inter-toggle gap {gap_ms:.1f} ms < {interval_ms} ms; "
+        "the OutputRateLimiter is not shared across wrapper calls."
+    )
