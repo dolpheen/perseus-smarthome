@@ -1,6 +1,6 @@
 # LLM Agent Layer Design
 
-Status: Approved
+Status: Approved (Phase A Implemented 2026-05-03; Phase B remains Approved-only)
 Last reviewed: 2026-05-03
 Owner: Vadim
 Requirements: requirements.md
@@ -13,6 +13,20 @@ LAN. The agent reaches hardware exclusively through the existing
 Milestone 1 `rpi-io-mcp` server — it does not touch GPIO directly. Phase A
 ships the chat surface and live tool calls. Phase B adds persistent thing
 aliases and `deepagents` long-term memory.
+
+**Phase A status (2026-05-03):** Implemented. The two-process layout
+(`rpi-io-mcp.service` + `rpi-io-agent.service`), the agent factory and
+chat service under `src/perseus_smarthome/agent/`, the additive
+`list_devices.rate_limit` MCP contract extension, the per-device
+`asyncio.Lock` and per-device inter-toggle interval guard (using the
+single `output_min_interval_ms` value sourced from `list_devices`),
+the most-recent-wins WebSocket session policy, the
+`EnvironmentFile=-` degraded-boot path, and both install paths'
+agent-unit deployment are all on `main`.
+Bench smoke executed on the live Pi (host coordinates in local
+`.env`) is captured in the LLM-A-9 closing comment on issue #77. Phase B sections of this
+design (alias store, `CompositeBackend` long-term memory) remain
+Approved-only and ungated until a Phase B kickoff.
 
 The Milestone 1 MCP boundary already enforces the configured-device
 allowlist and the GPIO23 safe-default. The agent layer inherits both for
@@ -29,9 +43,9 @@ free by going through that boundary.
   the existing `rpi-io-mcp.service`.
 - Chat transport: WebSocket over plain HTTP on the trusted LAN. TLS is
   out of scope for this milestone (matches Milestone 1's posture).
-- Default chat listen address: `0.0.0.0`. Default chat port: TBD,
-  proposed `8765`. Endpoint: `ws://<pi>:8765/chat`. Static page at
-  `http://<pi>:8765/`.
+- Default chat listen address: `0.0.0.0`. Default chat port: `8765`
+  (shipped Phase A default). Endpoint: `ws://<pi>:8765/chat`. Static
+  page at `http://<pi>:8765/`.
 - LLM transport: HTTPS to OpenRouter at
   `https://openrouter.ai/api/v1` using the OpenAI Chat Completions
   schema. Default model: `tencent/hy3-preview:free` (262K context,
@@ -609,3 +623,21 @@ None. All design decisions are resolved.
   endpoints. `ANTHROPIC_API_KEY` and `LANGSMITH_*` are documented as
   approved agent-runtime keys. `LLM_API_KEY` remains a deprecated
   fallback. Deployment filtering and examples were updated to match.
+- 2026-05-03: Phase A closeout (LLM-A-10). Top-level `Status`
+  callout extended with Phase A Implemented note; Phase A status
+  block added to the Summary section pointing reviewers at the
+  bench-evidence comment on issue #77. No design content changed —
+  this is a status-flip pass only. Phase B sections remain
+  Approved-only and untouched. Implementation residual risks
+  surfaced during the bench smoke are tracked outside this spec
+  on follow-up issues #98 (Phase B `tool_call` arg redaction
+  prereq), #102 (`rustc`/`cargo` to `APT_PREREQS`), #103 (PR #101
+  graceful-shutdown SIGKILL on `TimeoutStopSec=10`), and #104
+  (`AGENT-FR-006` `read_input` vs `list_devices.state` shortcut
+  divergence). The pre-existing Residual Risks list in this file
+  (`tencent/hy3-preview:free` going-away, OpenRouter free-tier
+  rate limits, supplementary-`gpio` group inheritance) is
+  unchanged; the OpenRouter free-tier risk was confirmed
+  empirically on the bench (five free models hit different
+  failure modes; smoke completed against
+  `google/gemini-3-flash-preview` paid).

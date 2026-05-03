@@ -1,11 +1,11 @@
 # LLM Agent Layer
 
-Status: Approved
+Status: Approved (Phase A Implemented 2026-05-03; Phase B remains Approved-only)
 Last reviewed: 2026-05-03
 Owner: Vadim
 Parent spec: ../../project.spec.md
-Related code: TBD
-Related tests: TBD
+Related code: ../../../src/perseus_smarthome/agent/__init__.py; ../../../src/perseus_smarthome/agent/__main__.py; ../../../src/perseus_smarthome/agent/chat_service.py; ../../../src/perseus_smarthome/agent/factory.py; ../../../src/perseus_smarthome/agent/mcp_tools.py; ../../../src/perseus_smarthome/agent/rate_limit.py; ../../../src/perseus_smarthome/agent/static/; ../../../src/perseus_smarthome/config.py (Phase A `[rate_limit]` table parser); ../../../src/perseus_smarthome/server.py (Phase A wiring of `rate_limit_ms` into `GPIOService`); ../../../src/perseus_smarthome/service.py (Phase A `list_devices.rate_limit` field populated here); ../../../deploy/systemd/rpi-io-agent.service; ../../../packaging/debian/perseus-smarthome-agent.service; ../../../packaging/debian/postinst; ../../../packaging/debian/prerm; ../../../packaging/debian/postrm; ../../../packaging/build-deb.sh; ../../../scripts/install.sh; ../../../scripts/remote-install.sh; ../../../docs/agent-smoke.md; ../../../docs/deployment.md; ../../../.env.example
+Related tests: ../../../tests/agent/test_chat_service.py; ../../../tests/agent/test_factory.py; ../../../tests/agent/test_llm_smoke.py; ../../../tests/agent/test_mcp_tools.py; ../../../tests/agent/test_rate_limit.py; ../../../tests/e2e/test_agent_chat.py; ../../../tests/e2e/test_agent_negative.py
 
 ## Summary
 
@@ -88,6 +88,24 @@ not be able to toggle pins or devices that are not configured in
 
 ### Phase A — MVP
 
+**Status:** Implemented, with one tracked exception. Eleven of the
+twelve Phase A FRs (`AGENT-FR-001` through `AGENT-FR-005`,
+`AGENT-FR-007` through `AGENT-FR-012`) are wired in code under
+`src/perseus_smarthome/agent/`, the `rpi-io-agent.service` systemd
+unit, and the Phase A integration tests in `tests/agent/` and
+`tests/e2e/`. `AGENT-FR-006` is **tracked-Implemented** with a known
+tool-path divergence captured in #104: the bench observation showed
+the agent answering "what is on pin 24" by reading the
+`list_devices.state` field rather than issuing the `read_input` call
+the FR text mandates. The operator-visible result was correct, so
+this closeout keeps the FR text as-is and defers resolution
+(tighten the system prompt to require `read_input`, drop `state`
+from `list_devices`, or relax the FR) to #104. Bench-verified on
+Raspberry Pi 2 on 2026-05-03 (host coordinates in local `.env`) —
+see the LLM-A-9 closing comment on issue #77 for the captured
+evidence (four MVP prompts, the FR-007 prompt-injection variant,
+and reboot persistence).
+
 - AGENT-FR-001: The Pi must run a chat service that accepts WebSocket
   connections from a browser on the trusted LAN.
 - AGENT-FR-002: The chat service must serve a minimal static HTML+JS page
@@ -154,6 +172,20 @@ not be able to toggle pins or devices that are not configured in
 ## Acceptance Criteria
 
 ### Phase A
+
+**Status:** All Phase A acceptance gates green at the operator-visible
+level — the "what is on pin 24" bullet asks the response to include
+the current `read_input` value (`0` or `1`), which the bench reply
+delivered correctly. The `AGENT-FR-006` exception in the Phase A FR
+status block above is about the FR-prescribed tool path
+(`read_input` call) not being exercised; the corresponding
+acceptance bullet did pass. Bench smoke executed 2026-05-03 on
+Raspberry Pi 2 (see issue #77 closing comment for the captured
+prompts, MCP tool calls, agent replies, GPIO loopback readings, and
+reboot persistence). Negative-path coverage (`AGENT-FR-007` prompt
+injection, unconfigured pin refusal, `llm_unconfigured` degraded
+boot, MCP-restart resilience) is held by the regression tests in
+`tests/e2e/test_agent_negative.py` per `tasks.md` LLM-A-8b.
 
 - Given the Pi has booted, when the operator opens the chat URL on the
   LAN, then a WebSocket chat session is established without manual
@@ -543,3 +575,19 @@ and Change Log).
   documented/deployed for framework compatibility. `LLM_API_KEY`
   remains a deprecated fallback so existing installs do not break
   abruptly.
+- 2026-05-03: Phase A closeout (LLM-A-10). Phase A FRs
+  `AGENT-FR-001` through `AGENT-FR-012` flipped to
+  Implemented-tracked status; bench smoke captured in the closing
+  comment on issue #77. `Related code` and `Related tests` populated
+  with the Phase A surface. Top-level `Status` callout extended with
+  `Phase A Implemented 2026-05-03; Phase B remains Approved-only`
+  rather than flipping the whole spec to `Implemented` because Phase
+  B FRs (`AGENT-FR-020` through `AGENT-FR-027`) are not yet built.
+  Four follow-ups filed and intentionally deferred out of this
+  closeout: #98 (Phase B `tool_call` arg redaction prereq), #102
+  (`rustc`/`cargo` to `APT_PREREQS`), #103 (PR #101 graceful-shutdown
+  SIGKILL after `TimeoutStopSec=10`), #104 (`AGENT-FR-006` agent
+  used the `list_devices.state` shortcut on the bench instead of
+  calling `read_input`; result was correct, but the FR text says
+  the agent "must call `read_input`" — kept as-is in this PR and
+  resolved by #104 later).
