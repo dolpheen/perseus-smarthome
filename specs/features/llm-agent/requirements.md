@@ -88,14 +88,23 @@ not be able to toggle pins or devices that are not configured in
 
 ### Phase A — MVP
 
-**Status:** Implemented. All twelve Phase A FRs are wired in code under
-`src/perseus_smarthome/agent/`, the `rpi-io-agent.service` systemd unit,
-and the Phase A integration tests in `tests/agent/` and `tests/e2e/`.
-Bench-verified on Raspberry Pi 2 on 2026-05-03 (host coordinates in
-local `.env`) — see
-the LLM-A-9 closing comment on issue #77 for the captured evidence
-(four MVP prompts, the FR-007 prompt-injection variant, and reboot
-persistence).
+**Status:** Implemented, with one tracked exception. Eleven of the
+twelve Phase A FRs (`AGENT-FR-001` through `AGENT-FR-005`,
+`AGENT-FR-007` through `AGENT-FR-012`) are wired in code under
+`src/perseus_smarthome/agent/`, the `rpi-io-agent.service` systemd
+unit, and the Phase A integration tests in `tests/agent/` and
+`tests/e2e/`. `AGENT-FR-006` is **tracked-Implemented** with a known
+tool-path divergence captured in #104: the bench observation showed
+the agent answering "what is on pin 24" by reading the
+`list_devices.state` field rather than issuing the `read_input` call
+the FR text mandates. The operator-visible result was correct, so
+this closeout keeps the FR text as-is and defers resolution
+(tighten the system prompt to require `read_input`, drop `state`
+from `list_devices`, or relax the FR) to #104. Bench-verified on
+Raspberry Pi 2 on 2026-05-03 (host coordinates in local `.env`) —
+see the LLM-A-9 closing comment on issue #77 for the captured
+evidence (four MVP prompts, the FR-007 prompt-injection variant,
+and reboot persistence).
 
 - AGENT-FR-001: The Pi must run a chat service that accepts WebSocket
   connections from a browser on the trusted LAN.
