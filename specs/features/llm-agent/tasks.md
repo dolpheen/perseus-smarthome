@@ -11,13 +11,18 @@ Design: design.md
 ### Phase A — MVP
 
 **Status: Complete (verified on bench 2026-05-03).** All Phase A
-acceptance bullets below are satisfied on `main` and were
-re-verified end-to-end on the live Raspberry Pi 2 (host coordinates
-in local `.env`). The LLM-A-9 closing comment on issue #77 captures
-the four MVP prompts, the FR-007 prompt-injection variant, observed
-MCP tool calls, agent replies, GPIO loopback readings, and reboot
-persistence. Negative
-paths (`AGENT-FR-007` refusal, `llm_unconfigured` degraded boot,
+acceptance bullets below are satisfied at the operator-visible level
+on `main` and were re-verified end-to-end on the live Raspberry Pi 2
+(host coordinates in local `.env`). The "what is on pin 24" bullet
+asks the response to include the current `read_input` value, which
+the bench reply delivered correctly; the FR-prescribed tool path
+(`read_input` call) was not exercised — that delta is the
+`AGENT-FR-006` divergence tracked at the FR-status level in
+`requirements.md` and as follow-up #104 below. The LLM-A-9 closing
+comment on issue #77 captures the four MVP prompts, the FR-007
+prompt-injection variant, observed MCP tool calls, agent replies,
+GPIO loopback readings, and reboot persistence. Negative paths
+(`AGENT-FR-007` refusal, `llm_unconfigured` degraded boot,
 `AGENT-FR-012` MCP-restart resilience) remain covered as durable
 regression tests in `tests/e2e/test_agent_negative.py` and
 `tests/agent/`. Four follow-ups intentionally deferred out of this

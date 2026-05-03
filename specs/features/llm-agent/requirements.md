@@ -173,14 +173,19 @@ and reboot persistence).
 
 ### Phase A
 
-**Status:** All Phase A acceptance gates green. Bench smoke executed
-2026-05-03 on Raspberry Pi 2 (see issue #77 closing comment for the
-captured prompts, MCP tool calls, agent replies, GPIO loopback
-readings, and reboot persistence). Negative-path coverage
-(`AGENT-FR-007` prompt injection, unconfigured pin refusal,
-`llm_unconfigured` degraded boot, MCP-restart resilience) is held by
-the regression tests in `tests/e2e/test_agent_negative.py` per
-`tasks.md` LLM-A-8b.
+**Status:** All Phase A acceptance gates green at the operator-visible
+level — the "what is on pin 24" bullet asks the response to include
+the current `read_input` value (`0` or `1`), which the bench reply
+delivered correctly. The `AGENT-FR-006` exception in the Phase A FR
+status block above is about the FR-prescribed tool path
+(`read_input` call) not being exercised; the corresponding
+acceptance bullet did pass. Bench smoke executed 2026-05-03 on
+Raspberry Pi 2 (see issue #77 closing comment for the captured
+prompts, MCP tool calls, agent replies, GPIO loopback readings, and
+reboot persistence). Negative-path coverage (`AGENT-FR-007` prompt
+injection, unconfigured pin refusal, `llm_unconfigured` degraded
+boot, MCP-restart resilience) is held by the regression tests in
+`tests/e2e/test_agent_negative.py` per `tasks.md` LLM-A-8b.
 
 - Given the Pi has booted, when the operator opens the chat URL on the
   LAN, then a WebSocket chat session is established without manual

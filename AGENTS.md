@@ -6,7 +6,7 @@ This repo uses Specification-Driven Development (SDD). Do not start coding a beh
 
 Project: Raspberry Pi smart home control through MCP.
 
-Milestone 1: Raspberry Pi I/O MCP server only. No LLM agent implementation yet.
+Milestone 1: Raspberry Pi I/O MCP server only — no LLM agent code in this milestone's scope. Milestone 2 Phase A (LLM agent layer MVP, `specs/features/llm-agent/`) is now Implemented as of 2026-05-03; see the Current Status section below for the live state.
 
 Target:
 
