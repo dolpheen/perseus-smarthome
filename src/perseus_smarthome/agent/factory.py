@@ -9,6 +9,7 @@ Design: specs/features/llm-agent/design.md
 from __future__ import annotations
 
 import os
+from collections.abc import Awaitable, Callable
 from typing import Any
 
 # ---------------------------------------------------------------------------
@@ -155,36 +156,78 @@ def _resolve_provider_api_key() -> str:
 # ---------------------------------------------------------------------------
 
 
-def _build_default_tools(mcp_url: str) -> list[Any]:
-    """Return Phase A async LangChain tool wrappers targeting *mcp_url*.
+def _make_session_call_tool(
+    mcp_url: str,
+) -> Callable[[str, dict[str, Any]], Awaitable[dict[str, Any]]]:
+    """Return an async ``call_tool(name, args)`` that opens a fresh MCP session per call.
 
-    Each wrapper opens a fresh streamable-HTTP MCP session via
-    :class:`~perseus_smarthome.agent.mcp_tools.RpiIOMCPTools`, issues the
-    call, and closes the session.  The chat service (LLM-A-5) will pass a
-    long-lived session-backed tool list to ``create_agent()`` directly for
-    production efficiency; this path is used when ``tools=None``.
+    Each invocation opens a streamable-HTTP MCP session, initialises it,
+    issues the tool call, and closes the session.  Keeping a per-call session
+    preserves the AGENT-FR-012 transparent-reconnect property: a stale
+    transport never persists across calls.  The returned callable is meant
+    to be wrapped by a single shared :class:`RpiIOMCPTools` instance so the
+    rate limiter, per-device locks, and known-device cache survive across
+    calls (Resolved Decision #7 / AGENT-FR-007).
     """
-    from langchain_core.tools import tool  # noqa: PLC0415
     from mcp import ClientSession  # noqa: PLC0415
     from mcp.client.streamable_http import streamablehttp_client  # noqa: PLC0415
 
+    from perseus_smarthome.agent.mcp_tools import MCPToolError  # noqa: PLC0415
+
+    async def _call(name: str, args: dict[str, Any]) -> dict[str, Any]:
+        async with streamablehttp_client(mcp_url) as (read, write, _):
+            async with ClientSession(read, write) as session:
+                await session.initialize()
+                result = await session.call_tool(name, args)
+        if result.structuredContent is not None:
+            return result.structuredContent
+        raise MCPToolError(
+            "protocol_error",
+            f"MCP server returned no structured content for tool '{name}'.",
+        )
+
+    return _call
+
+
+def _build_default_tools(
+    mcp_url: str,
+    *,
+    call_tool: Callable[[str, dict[str, Any]], Awaitable[dict[str, Any]]] | None = None,
+) -> list[Any]:
+    """Return Phase A async LangChain tool wrappers targeting *mcp_url*.
+
+    All four wrappers delegate to a **single** shared
+    :class:`~perseus_smarthome.agent.mcp_tools.RpiIOMCPTools` instance.
+    Each underlying call still opens a fresh streamable-HTTP MCP session
+    (preserving AGENT-FR-012 transparent reconnect), but the per-device
+    :class:`asyncio.Lock`, last-call timestamps, and known-device cache
+    persist across calls so the rate limiter (Resolved Decision #7 /
+    AGENT-FR-007) actually serializes successive ``set_output`` calls in
+    production.
+
+    Args:
+        mcp_url: MCP server URL used by the default per-call session opener.
+        call_tool: Optional async ``(tool_name, args) -> structured_dict``
+            callable.  When provided, replaces the default per-call session
+            opener; intended for unit tests that must avoid real network I/O.
+    """
+    from langchain_core.tools import tool  # noqa: PLC0415
+
     from perseus_smarthome.agent.mcp_tools import RpiIOMCPTools  # noqa: PLC0415
+
+    if call_tool is None:
+        call_tool = _make_session_call_tool(mcp_url)
+    shared = RpiIOMCPTools(call_tool)
 
     @tool
     async def health() -> dict[str, Any]:
         """Return GPIO service health."""
-        async with streamablehttp_client(mcp_url) as (read, write, _):
-            async with ClientSession(read, write) as session:
-                await session.initialize()
-                return await RpiIOMCPTools.from_session(session).health()
+        return await shared.health()
 
     @tool
     async def list_devices() -> dict[str, Any]:
         """List configured GPIO devices with capabilities and current state."""
-        async with streamablehttp_client(mcp_url) as (read, write, _):
-            async with ClientSession(read, write) as session:
-                await session.initialize()
-                return await RpiIOMCPTools.from_session(session).list_devices()
+        return await shared.list_devices()
 
     @tool
     async def set_output(device_id: str, value: int) -> dict[str, Any]:
@@ -194,12 +237,7 @@ def _build_default_tools(mcp_url: str) -> list[Any]:
             device_id: The device ID from list_devices (e.g. ``gpio23_output``).
             value: ``0`` to turn off, ``1`` to turn on.
         """
-        async with streamablehttp_client(mcp_url) as (read, write, _):
-            async with ClientSession(read, write) as session:
-                await session.initialize()
-                return await RpiIOMCPTools.from_session(session).set_output(
-                    device_id, value
-                )
+        return await shared.set_output(device_id, value)
 
     @tool
     async def read_input(device_id: str) -> dict[str, Any]:
@@ -208,9 +246,6 @@ def _build_default_tools(mcp_url: str) -> list[Any]:
         Args:
             device_id: The device ID from list_devices (e.g. ``gpio24_input``).
         """
-        async with streamablehttp_client(mcp_url) as (read, write, _):
-            async with ClientSession(read, write) as session:
-                await session.initialize()
-                return await RpiIOMCPTools.from_session(session).read_input(device_id)
+        return await shared.read_input(device_id)
 
     return [health, list_devices, set_output, read_input]
