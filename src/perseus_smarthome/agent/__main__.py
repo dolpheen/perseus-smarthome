@@ -21,6 +21,32 @@ import logging
 import os
 import signal
 import sys
+from typing import Any
+
+
+async def _serve_until_signalled(service: Any) -> None:
+    """Run *service* and cancel cleanly on SIGTERM/SIGINT.
+
+    Installs ``loop.add_signal_handler`` for SIGTERM and SIGINT so the
+    serve task is cancelled from inside the event loop. This lets the
+    ``async with serve(...)`` context exit cleanly (closing WebSocket
+    connections with a proper close frame), instead of being torn down
+    by ``sys.exit`` from a sync signal handler.
+    """
+    loop = asyncio.get_running_loop()
+    run_task = asyncio.create_task(service.run())
+
+    def _request_stop() -> None:
+        if not run_task.done():
+            run_task.cancel()
+
+    for sig in (signal.SIGTERM, signal.SIGINT):
+        loop.add_signal_handler(sig, _request_stop)
+
+    try:
+        await run_task
+    except asyncio.CancelledError:
+        pass
 
 
 def main() -> None:
@@ -51,13 +77,7 @@ def main() -> None:
         port=port,
     )
 
-    # Install SIGTERM handler so systemd stop/restart cycles shut down cleanly.
-    signal.signal(signal.SIGTERM, lambda *_: sys.exit(0))
-
-    try:
-        asyncio.run(service.run())
-    except KeyboardInterrupt:
-        pass
+    asyncio.run(_serve_until_signalled(service))
 
 
 if __name__ == "__main__":
