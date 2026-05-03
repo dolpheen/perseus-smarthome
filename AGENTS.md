@@ -52,9 +52,9 @@ of 2026-05-03. The `specs/features/llm-agent/` spec set carries
 `Status: Approved (Phase A Implemented 2026-05-03; Phase B remains
 Approved-only)` across `requirements.md`, `design.md`, and
 `tasks.md`. Phase B (`AGENT-FR-020` … `AGENT-FR-027`: persistent
-thing aliases + `deepagents` long-term memory) remains gated and
-ungated work has not started. Phase B's `tool_call` arg-redaction
-prereq is filed as #98.
+thing aliases + `deepagents` long-term memory) remains gated; no
+Phase B implementation work has started. Phase B's `tool_call`
+arg-redaction prereq is filed as #98.
 
 The project-level spec at `specs/project.spec.md` remains
 `Status: Approved` because broader project scope (CC2531/Zigbee, future

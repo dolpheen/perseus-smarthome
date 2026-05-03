@@ -14,7 +14,7 @@ Design: design.md
 acceptance bullets below are satisfied at the operator-visible level
 on `main` and were re-verified end-to-end on the live Raspberry Pi 2
 (host coordinates in local `.env`). The "what is on pin 24" bullet
-asks the response to include the current `read_input` value, which
+asks that the response include the current `read_input` value, which
 the bench reply delivered correctly; the FR-prescribed tool path
 (`read_input` call) was not exercised — that delta is the
 `AGENT-FR-006` divergence tracked at the FR-status level in
