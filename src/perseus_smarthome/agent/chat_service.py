@@ -70,7 +70,16 @@ def _event_to_frame(event: dict[str, Any]) -> dict[str, Any] | None:
             result = dict(raw)  # copy: avoid mutating the original event payload
         else:
             result = {}
-        ok = result.pop("ok", True) if isinstance(result, dict) else True
+        # ToolNode wraps tool wrapper exceptions as ToolMessage(status="error")
+        # with content=str(exc); treat that as ok=False even if the decoded
+        # payload has a stray "ok" key.
+        status_error = getattr(raw, "status", None) == "error"
+        if isinstance(result, dict):
+            ok = result.pop("ok", True)
+        else:
+            ok = True
+        if status_error:
+            ok = False
         frame: dict[str, Any] = {
             "type": "tool_result",
             "name": event.get("name", ""),

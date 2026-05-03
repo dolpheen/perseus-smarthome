@@ -50,6 +50,18 @@ if _WS_AVAILABLE:
     from perseus_smarthome.agent.chat_service import ChatService, _event_to_frame
     from perseus_smarthome.agent.factory import _UnconfiguredAgent
 
+# ToolMessage lives in langchain_core (only present with [agent] extras).
+_LANGCHAIN_CORE_AVAILABLE = True
+try:
+    from langchain_core.messages import ToolMessage
+except ImportError:
+    _LANGCHAIN_CORE_AVAILABLE = False
+
+_skip_without_langchain_core = pytest.mark.skipif(
+    not _LANGCHAIN_CORE_AVAILABLE,
+    reason="requires langchain_core ([agent] extras)",
+)
+
 
 # ---------------------------------------------------------------------------
 # Stub agent / factory helpers
@@ -223,6 +235,47 @@ def test_event_to_frame_tool_end_not_ok() -> None:
 
 
 @_skip_without_ws
+@_skip_without_langchain_core
+def test_event_to_frame_tool_end_tool_message_status_error() -> None:
+    """ToolMessage(status="error") with plain-string content → ok=False.
+
+    LangGraph's ToolNode wraps a tool wrapper exception (e.g.
+    ``MCPToolError("unknown_device", ...)``) as a
+    ``ToolMessage(status="error", content=str(exc))``. The chat service
+    must surface that as ``ok=False`` and keep the message text in the
+    frame so operators see the refusal, not a green check mark.
+    """
+    msg = ToolMessage(
+        content="Device 'foo' is not configured.",
+        tool_call_id="x",
+        status="error",
+    )
+    event = {"event": "on_tool_end", "name": "set_output", "data": {"output": msg}}
+    frame = _event_to_frame(event)
+    assert frame is not None
+    assert frame["type"] == "tool_result"
+    assert frame["name"] == "set_output"
+    assert frame["ok"] is False
+    assert frame["content"] == "Device 'foo' is not configured."
+
+
+@_skip_without_ws
+@_skip_without_langchain_core
+def test_event_to_frame_tool_end_status_error_overrides_ok_key() -> None:
+    """status="error" wins over a stray "ok": True in the JSON payload."""
+    msg = ToolMessage(
+        content=json.dumps({"ok": True, "code": "unknown_device"}),
+        tool_call_id="x",
+        status="error",
+    )
+    event = {"event": "on_tool_end", "name": "set_output", "data": {"output": msg}}
+    frame = _event_to_frame(event)
+    assert frame is not None
+    assert frame["ok"] is False
+    assert frame["code"] == "unknown_device"
+
+
+@_skip_without_ws
 def test_event_to_frame_chat_model_end_text() -> None:
     """on_chat_model_end with text content → agent_turn frame."""
     event = _chat_end("Turning on the light.")
@@ -371,6 +424,40 @@ async def _async_test_multi_tool() -> None:
     tool_results = [f for f in frames if f["type"] == "tool_result"]
     assert len(tool_calls) == 2
     assert len(tool_results) == 2
+    assert frames[-1]["type"] == "agent_done"
+
+
+@_skip_without_ws
+@_skip_without_langchain_core
+def test_tool_result_frame_marks_error_when_tool_message_status_error() -> None:
+    """End-to-end: a ToolMessage(status="error") in stream → tool_result with ok=False."""
+    asyncio.run(_async_test_tool_message_error_frame())
+
+
+async def _async_test_tool_message_error_frame() -> None:
+    err_msg = ToolMessage(
+        content="Device 'foo' is not configured.",
+        tool_call_id="x",
+        status="error",
+    )
+    events = [
+        _tool_start("set_output", {"device_id": "foo", "value": 1}),
+        {
+            "event": "on_tool_end",
+            "name": "set_output",
+            "data": {"output": err_msg},
+        },
+        _chat_end("Sorry, that device is not configured."),
+    ]
+    async with _running_service(_stub_factory([events])) as (_, port):
+        async with ws_connect(f"ws://127.0.0.1:{port}/chat") as ws:
+            await ws.send(json.dumps({"type": "user_turn", "content": "turn on foo"}))
+            frames = await _collect_turn(ws)
+
+    result = next(f for f in frames if f["type"] == "tool_result")
+    assert result["name"] == "set_output"
+    assert result["ok"] is False
+    assert result["content"] == "Device 'foo' is not configured."
     assert frames[-1]["type"] == "agent_done"
 
 
