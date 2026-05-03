@@ -18,9 +18,11 @@ aliases and `deepagents` long-term memory.
 (`rpi-io-mcp.service` + `rpi-io-agent.service`), the agent factory and
 chat service under `src/perseus_smarthome/agent/`, the additive
 `list_devices.rate_limit` MCP contract extension, the per-device
-`asyncio.Lock` + global inter-toggle guard, the most-recent-wins
-WebSocket session policy, the `EnvironmentFile=-` degraded-boot path,
-and both install paths' agent-unit deployment are all on `main`.
+`asyncio.Lock` and per-device inter-toggle interval guard (using the
+single `output_min_interval_ms` value sourced from `list_devices`),
+the most-recent-wins WebSocket session policy, the
+`EnvironmentFile=-` degraded-boot path, and both install paths'
+agent-unit deployment are all on `main`.
 Bench smoke executed on the live Pi (host coordinates in local
 `.env`) is captured in the LLM-A-9 closing comment on issue #77. Phase B sections of this
 design (alias store, `CompositeBackend` long-term memory) remain
