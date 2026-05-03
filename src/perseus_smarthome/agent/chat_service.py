@@ -45,9 +45,11 @@ def _event_to_frame(event: dict[str, Any]) -> dict[str, Any] | None:
         return {
             "type": "tool_call",
             "name": event.get("name", ""),
-            # TODO: add per-field redaction here when Phase B tools carry
-            # credentials, webhook URLs, or PII (design.md "Error Model",
-            # AGENT-FR-010: no credential value in any frame or log line).
+            # Phase A tools take only device_id (str enum) and value (int
+            # 0/1), so echoing args verbatim is safe. Phase B tools that
+            # accept free-form text must redact per-field before this frame
+            # is sent — tracked in issue #98 (AGENT-FR-010, design.md
+            # "Error Model").
             "args": event.get("data", {}).get("input", {}),
         }
 
@@ -189,9 +191,9 @@ class ChatService:
             except Exception:
                 pass  # prior connection may already be gone
 
-        agent = self._agent_factory()
-
         try:
+            agent = self._agent_factory()
+
             async for raw in ws:
                 try:
                     msg = json.loads(raw)
@@ -223,6 +225,19 @@ class ChatService:
                     await self._run_turn(agent, msg.get("content", ""), ws)
         except Exception:
             log.exception("Unexpected error in WebSocket connection handler")
+            with contextlib.suppress(Exception):
+                await ws.send(
+                    json.dumps(
+                        {
+                            "type": "error",
+                            "code": "agent_error",
+                            "message": (
+                                "An unexpected error occurred in the chat service. "
+                                "Check journalctl -u rpi-io-agent.service for details."
+                            ),
+                        }
+                    )
+                )
         finally:
             async with self._lock:
                 if self._current_ws is ws:

@@ -410,6 +410,35 @@ async def _async_test_unconfigured() -> None:
     assert frames[-1]["type"] == "agent_done"
 
 
+@_skip_without_ws
+def test_factory_raises_emits_agent_error_frame() -> None:
+    """When agent_factory raises, the connection handler emits an agent_error frame.
+
+    Covers the bug where exceptions escaping ``_run_turn`` (or pre-turn errors
+    such as the agent factory raising) were logged but never surfaced to the
+    operator's browser — the WebSocket would silently dead-end.
+    """
+    asyncio.run(_async_test_factory_raises())
+
+
+async def _async_test_factory_raises() -> None:
+    def _raising_factory() -> Any:
+        raise RuntimeError("boom — agent could not be constructed")
+
+    async with _running_service(_raising_factory) as (_, port):
+        async with ws_connect(f"ws://127.0.0.1:{port}/chat") as ws:
+            # Server will fail to construct the agent and emit an error
+            # frame before closing. We only need to observe the frame; the
+            # send may race the close so it is wrapped defensively.
+            with contextlib.suppress(Exception):
+                await ws.send(json.dumps({"type": "user_turn", "content": "hello"}))
+            frames = await _collect_turn(ws)
+
+    error_frames = [f for f in frames if f.get("type") == "error"]
+    assert error_frames, "expected an error frame surfaced to the WebSocket"
+    assert error_frames[0]["code"] == "agent_error"
+
+
 # ---------------------------------------------------------------------------
 # Session-superseded tests
 # ---------------------------------------------------------------------------
