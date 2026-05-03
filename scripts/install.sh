@@ -198,10 +198,12 @@ cmd_install() {
     || die "chown failed on ${INSTALL_DIR}."
 
   # Step 6: uv sync
-  log "Running uv sync --no-dev"
+  # --extra agent pulls in deepagents/langchain-openai/websockets so the
+  # rpi-io-agent console-script entrypoint can import them at startup.
+  log "Running uv sync --no-dev --extra agent"
   sudo -u "${DEPLOY_USER}" bash -lc \
-    "cd '${INSTALL_DIR}' && uv sync --no-dev" \
-    || die "uv sync --no-dev failed. Check the log above for details."
+    "cd '${INSTALL_DIR}' && uv sync --no-dev --extra agent" \
+    || die "uv sync --no-dev --extra agent failed. Check the log above for details."
 
   # Transfer ownership to service user after venv is built (DEP-FR-006).
   chown -R "${SERVICE_USER}:gpio" "${INSTALL_DIR}" \
@@ -235,11 +237,19 @@ cmd_install() {
   else
     log "WARNING: ${SERVICE} did not become active within 30 s. Check: journalctl -u ${SERVICE}"
   fi
+  # Asymmetry note: the MCP wait above is intentionally warning-only — that
+  # path is proven and we don't want to regress its existing logic. The agent
+  # path is new and a non-active unit here means the install is broken
+  # (typically a missing extra or a config error), so we fail loudly with the
+  # systemctl status and journal tail to help the operator diagnose.
   log "Waiting for ${AGENT_SERVICE} to become active (up to 30 s)"
   if wait_active "${AGENT_SERVICE}" 30; then
     log "${AGENT_SERVICE} is active"
   else
-    log "WARNING: ${AGENT_SERVICE} did not become active within 30 s. Check: journalctl -u ${AGENT_SERVICE}"
+    log "ERROR: ${AGENT_SERVICE} did not become active within 30 s."
+    systemctl status "${AGENT_SERVICE}" --no-pager || true
+    journalctl -u "${AGENT_SERVICE}" -n 50 --no-pager || true
+    die "rpi-io-agent.service failed to become active"
   fi
 
   cmd_status
@@ -301,10 +311,12 @@ cmd_upgrade() {
     || die "chown failed on ${INSTALL_DIR}."
 
   # Step 6: uv sync
-  log "Running uv sync --no-dev"
+  # --extra agent pulls in deepagents/langchain-openai/websockets so the
+  # rpi-io-agent console-script entrypoint can import them at startup.
+  log "Running uv sync --no-dev --extra agent"
   sudo -u "${DEPLOY_USER}" bash -lc \
-    "cd '${INSTALL_DIR}' && uv sync --no-dev" \
-    || die "uv sync --no-dev failed."
+    "cd '${INSTALL_DIR}' && uv sync --no-dev --extra agent" \
+    || die "uv sync --no-dev --extra agent failed."
 
   # Transfer ownership to service user after venv is built.
   chown -R "${SERVICE_USER}:gpio" "${INSTALL_DIR}" \
@@ -327,16 +339,34 @@ cmd_upgrade() {
   log "Reloading systemd and restarting ${SERVICE}"
   systemctl daemon-reload || die "systemctl daemon-reload failed."
   systemctl restart "${SERVICE}" || die "systemctl restart ${SERVICE} failed."
+  local agent_was_active=0
   if systemctl is-active --quiet "${AGENT_SERVICE}" 2>/dev/null; then
+    agent_was_active=1
     log "Restarting ${AGENT_SERVICE}"
     systemctl restart "${AGENT_SERVICE}" || die "systemctl restart ${AGENT_SERVICE} failed."
   fi
 
+  # Asymmetry note: MCP wait stays warning-only — that path is proven and
+  # changing it is out of scope. The agent wait fails loudly to surface a
+  # broken upgrade (e.g. missing extras after a dependency change) instead
+  # of letting the unit flap silently under Restart=on-failure.
   log "Waiting for ${SERVICE} to become active (up to 30 s)"
   if wait_active "${SERVICE}" 30; then
     log "${SERVICE} is active"
   else
     log "WARNING: ${SERVICE} did not become active within 30 s. Check: journalctl -u ${SERVICE}"
+  fi
+
+  if [[ "${agent_was_active}" -eq 1 ]]; then
+    log "Waiting for ${AGENT_SERVICE} to become active (up to 30 s)"
+    if wait_active "${AGENT_SERVICE}" 30; then
+      log "${AGENT_SERVICE} is active"
+    else
+      log "ERROR: ${AGENT_SERVICE} did not become active within 30 s."
+      systemctl status "${AGENT_SERVICE}" --no-pager || true
+      journalctl -u "${AGENT_SERVICE}" -n 50 --no-pager || true
+      die "rpi-io-agent.service failed to become active"
+    fi
   fi
 
   cmd_status

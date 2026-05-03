@@ -155,7 +155,7 @@ cp "${PACKAGED_AGENT_UNIT}" "${BUILD_DIR}/etc/systemd/system/rpi-io-agent.servic
 # ---------------------------------------------------------------------------
 # 7. Build the virtualenv into the staged tree
 # ---------------------------------------------------------------------------
-echo "==> Running uv sync --no-dev --no-editable into staged tree..."
+echo "==> Running uv sync --no-dev --no-editable --extra agent into staged tree..."
 if [ ! -f "${REPO_ROOT}/uv.lock" ]; then
   echo "ERROR: uv.lock not found at ${REPO_ROOT}/uv.lock." >&2
   echo "       Commit a current uv.lock before building the package." >&2
@@ -165,9 +165,11 @@ fi
 # of dropping a `.pth` pointer at the build directory. Without it, the
 # installed venv tries to import perseus_smarthome from a path that only
 # exists on the build host.
+# --extra agent pulls in deepagents/langchain-openai/websockets so the
+# rpi-io-agent console-script entrypoint can import them at startup.
 (
   cd "${BUILD_DIR}/opt/raspberry-smarthome"
-  uv sync --no-dev --no-editable
+  uv sync --no-dev --no-editable --extra agent
 )
 
 # uv creates the venv with its absolute build-time path baked into every
