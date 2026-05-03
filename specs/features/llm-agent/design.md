@@ -41,9 +41,9 @@ free by going through that boundary.
   the existing `rpi-io-mcp.service`.
 - Chat transport: WebSocket over plain HTTP on the trusted LAN. TLS is
   out of scope for this milestone (matches Milestone 1's posture).
-- Default chat listen address: `0.0.0.0`. Default chat port: TBD,
-  proposed `8765`. Endpoint: `ws://<pi>:8765/chat`. Static page at
-  `http://<pi>:8765/`.
+- Default chat listen address: `0.0.0.0`. Default chat port: `8765`
+  (shipped Phase A default). Endpoint: `ws://<pi>:8765/chat`. Static
+  page at `http://<pi>:8765/`.
 - LLM transport: HTTPS to OpenRouter at
   `https://openrouter.ai/api/v1` using the OpenAI Chat Completions
   schema. Default model: `tencent/hy3-preview:free` (262K context,
