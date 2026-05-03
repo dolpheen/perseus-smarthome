@@ -1,6 +1,6 @@
 # LLM Agent Layer Tasks
 
-Status: Approved
+Status: Approved (Phase A Implemented 2026-05-03; Phase B remains Approved-only)
 Last reviewed: 2026-05-03
 Owner: Vadim
 Requirements: requirements.md
@@ -9,6 +9,22 @@ Design: design.md
 ## Phase Acceptance
 
 ### Phase A — MVP
+
+**Status: Complete (verified on bench 2026-05-03).** All Phase A
+acceptance bullets below are satisfied on `main` and were
+re-verified end-to-end on the live Raspberry Pi 2 at `172.16.0.106`
+(LLM-A-9 closing comment on issue #77 captures the four MVP prompts,
+the FR-007 prompt-injection variant, observed MCP tool calls, agent
+replies, GPIO loopback readings, and reboot persistence). Negative
+paths (`AGENT-FR-007` refusal, `llm_unconfigured` degraded boot,
+`AGENT-FR-012` MCP-restart resilience) remain covered as durable
+regression tests in `tests/e2e/test_agent_negative.py` and
+`tests/agent/`. Four follow-ups intentionally deferred out of this
+closeout: #98 (Phase B `tool_call` arg redaction prereq), #102
+(`rustc`/`cargo` to `APT_PREREQS`), #103 (PR #101 graceful-shutdown
+SIGKILL on `TimeoutStopSec=10`), #104 (`AGENT-FR-006` agent path
+divergence — answered correctly via `list_devices.state` instead of
+calling `read_input` on the bench).
 
 This phase is complete when:
 
@@ -524,3 +540,15 @@ acceptance, link to FR ids).
   explicit default-route credential, keep `OPENAI_API_KEY` for
   OpenAI-compatible endpoints, document/deploy `ANTHROPIC_API_KEY` and
   `LANGSMITH_*`, and retain `LLM_API_KEY` only as a deprecated fallback.
+- 2026-05-03: Phase A closeout (LLM-A-10). Phase A is marked
+  Implemented at the phase-acceptance level with a
+  verified-on-bench note pointing at the LLM-A-9 closing comment on
+  issue #77. Implementation PRs landed across the prior cycle:
+  LLM-A-0 (#80), LLM-A-1 (#81), LLM-A-2 (#82), LLM-A-3 (#84),
+  LLM-A-4 (#83), LLM-A-5 (#85), LLM-A-6 (#86), LLM-A-7 (#89),
+  LLM-A-8 (#87), LLM-A-8b (#88), LLM-A-9 (#90), with cross-cutting
+  fixes #93/#96/#97/#99/#100/#101 folded in before the bench smoke.
+  Phase B issues `LLM-B-1` through `LLM-B-7` remain gated on this
+  closeout and on Phase B's `tool_call` arg-redaction prereq (#98).
+  Top-level `Status` callout extended to record that Phase A is
+  Implemented while Phase B stays Approved-only.

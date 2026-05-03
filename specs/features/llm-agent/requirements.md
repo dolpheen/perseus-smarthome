@@ -1,11 +1,11 @@
 # LLM Agent Layer
 
-Status: Approved
+Status: Approved (Phase A Implemented 2026-05-03; Phase B remains Approved-only)
 Last reviewed: 2026-05-03
 Owner: Vadim
 Parent spec: ../../project.spec.md
-Related code: TBD
-Related tests: TBD
+Related code: ../../../src/perseus_smarthome/agent/__init__.py; ../../../src/perseus_smarthome/agent/__main__.py; ../../../src/perseus_smarthome/agent/chat_service.py; ../../../src/perseus_smarthome/agent/factory.py; ../../../src/perseus_smarthome/agent/mcp_tools.py; ../../../src/perseus_smarthome/agent/rate_limit.py; ../../../src/perseus_smarthome/agent/static/; ../../../src/perseus_smarthome/config.py (Phase A `[rate_limit]` table); ../../../src/perseus_smarthome/server.py (Phase A `list_devices.rate_limit` field); ../../../src/perseus_smarthome/service.py; ../../../deploy/systemd/rpi-io-agent.service; ../../../packaging/debian/perseus-smarthome-agent.service; ../../../packaging/debian/postinst; ../../../packaging/debian/prerm; ../../../packaging/debian/postrm; ../../../packaging/build-deb.sh; ../../../scripts/install.sh; ../../../scripts/remote-install.sh; ../../../docs/agent-smoke.md; ../../../docs/deployment.md; ../../../.env.example
+Related tests: ../../../tests/agent/test_chat_service.py; ../../../tests/agent/test_factory.py; ../../../tests/agent/test_llm_smoke.py; ../../../tests/agent/test_mcp_tools.py; ../../../tests/agent/test_rate_limit.py; ../../../tests/e2e/test_agent_chat.py; ../../../tests/e2e/test_agent_negative.py
 
 ## Summary
 
@@ -88,6 +88,14 @@ not be able to toggle pins or devices that are not configured in
 
 ### Phase A — MVP
 
+**Status:** Implemented. All twelve Phase A FRs are wired in code under
+`src/perseus_smarthome/agent/`, the `rpi-io-agent.service` systemd unit,
+and the Phase A integration tests in `tests/agent/` and `tests/e2e/`.
+Bench-verified on Raspberry Pi 2 at `172.16.0.106` on 2026-05-03 — see
+the LLM-A-9 closing comment on issue #77 for the captured evidence
+(four MVP prompts, the FR-007 prompt-injection variant, and reboot
+persistence).
+
 - AGENT-FR-001: The Pi must run a chat service that accepts WebSocket
   connections from a browser on the trusted LAN.
 - AGENT-FR-002: The chat service must serve a minimal static HTML+JS page
@@ -154,6 +162,15 @@ not be able to toggle pins or devices that are not configured in
 ## Acceptance Criteria
 
 ### Phase A
+
+**Status:** All Phase A acceptance gates green. Bench smoke executed
+2026-05-03 on Raspberry Pi 2 (see issue #77 closing comment for the
+captured prompts, MCP tool calls, agent replies, GPIO loopback
+readings, and reboot persistence). Negative-path coverage
+(`AGENT-FR-007` prompt injection, unconfigured pin refusal,
+`llm_unconfigured` degraded boot, MCP-restart resilience) is held by
+the regression tests in `tests/e2e/test_agent_negative.py` per
+`tasks.md` LLM-A-8b.
 
 - Given the Pi has booted, when the operator opens the chat URL on the
   LAN, then a WebSocket chat session is established without manual
@@ -543,3 +560,19 @@ and Change Log).
   documented/deployed for framework compatibility. `LLM_API_KEY`
   remains a deprecated fallback so existing installs do not break
   abruptly.
+- 2026-05-03: Phase A closeout (LLM-A-10). Phase A FRs
+  `AGENT-FR-001` through `AGENT-FR-012` flipped to
+  Implemented-tracked status; bench smoke captured in the closing
+  comment on issue #77. `Related code` and `Related tests` populated
+  with the Phase A surface. Top-level `Status` callout extended with
+  `Phase A Implemented 2026-05-03; Phase B remains Approved-only`
+  rather than flipping the whole spec to `Implemented` because Phase
+  B FRs (`AGENT-FR-020` through `AGENT-FR-027`) are not yet built.
+  Four follow-ups filed and intentionally deferred out of this
+  closeout: #98 (Phase B `tool_call` arg redaction prereq), #102
+  (`rustc`/`cargo` to `APT_PREREQS`), #103 (PR #101 graceful-shutdown
+  SIGKILL after `TimeoutStopSec=10`), #104 (`AGENT-FR-006` agent
+  used the `list_devices.state` shortcut on the bench instead of
+  calling `read_input`; result was correct, but the FR text says
+  the agent "must call `read_input`" — kept as-is in this PR and
+  resolved by #104 later).
