@@ -21,8 +21,8 @@ chat service under `src/perseus_smarthome/agent/`, the additive
 `asyncio.Lock` + global inter-toggle guard, the most-recent-wins
 WebSocket session policy, the `EnvironmentFile=-` degraded-boot path,
 and both install paths' agent-unit deployment are all on `main`.
-Bench smoke executed on the live Pi at `172.16.0.106` is captured in
-the LLM-A-9 closing comment on issue #77. Phase B sections of this
+Bench smoke executed on the live Pi (host coordinates in local
+`.env`) is captured in the LLM-A-9 closing comment on issue #77. Phase B sections of this
 design (alias store, `CompositeBackend` long-term memory) remain
 Approved-only and ungated until a Phase B kickoff.
 

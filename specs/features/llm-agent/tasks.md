@@ -12,10 +12,11 @@ Design: design.md
 
 **Status: Complete (verified on bench 2026-05-03).** All Phase A
 acceptance bullets below are satisfied on `main` and were
-re-verified end-to-end on the live Raspberry Pi 2 at `172.16.0.106`
-(LLM-A-9 closing comment on issue #77 captures the four MVP prompts,
-the FR-007 prompt-injection variant, observed MCP tool calls, agent
-replies, GPIO loopback readings, and reboot persistence). Negative
+re-verified end-to-end on the live Raspberry Pi 2 (host coordinates
+in local `.env`). The LLM-A-9 closing comment on issue #77 captures
+the four MVP prompts, the FR-007 prompt-injection variant, observed
+MCP tool calls, agent replies, GPIO loopback readings, and reboot
+persistence. Negative
 paths (`AGENT-FR-007` refusal, `llm_unconfigured` degraded boot,
 `AGENT-FR-012` MCP-restart resilience) remain covered as durable
 regression tests in `tests/e2e/test_agent_negative.py` and

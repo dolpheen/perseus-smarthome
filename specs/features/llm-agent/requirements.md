@@ -91,7 +91,8 @@ not be able to toggle pins or devices that are not configured in
 **Status:** Implemented. All twelve Phase A FRs are wired in code under
 `src/perseus_smarthome/agent/`, the `rpi-io-agent.service` systemd unit,
 and the Phase A integration tests in `tests/agent/` and `tests/e2e/`.
-Bench-verified on Raspberry Pi 2 at `172.16.0.106` on 2026-05-03 — see
+Bench-verified on Raspberry Pi 2 on 2026-05-03 (host coordinates in
+local `.env`) — see
 the LLM-A-9 closing comment on issue #77 for the captured evidence
 (four MVP prompts, the FR-007 prompt-injection variant, and reboot
 persistence).

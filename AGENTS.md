@@ -114,9 +114,9 @@ Implemented for Milestone 1:
 - MacBook E2E suite at `tests/e2e/test_rpi_io_mcp.py` with `--run-hardware` opt-in for loopback tests.
 - systemd service at `deploy/systemd/rpi-io-mcp.service`, remote wrapper at `scripts/remote-install.sh`, deployment guide at `docs/deployment.md`, manual smoke guide at `docs/manual-smoke-tests.md`.
 
-Milestone 2 Phase A acceptance gates green on the live Pi 2 at
-`172.16.0.106` on 2026-05-03. Bench evidence captured in the
-LLM-A-9 closing comment on issue #77:
+Milestone 2 Phase A acceptance gates green on the live Pi 2 on
+2026-05-03 (host coordinates in local `.env`). Bench evidence
+captured in the LLM-A-9 closing comment on issue #77:
 
 - Browser flow on `ws://<pi>:8765/chat`: four MVP prompts (`turn
   on pin 23` / `turn off pin 23` / `what is on pin 24` / `turn on
